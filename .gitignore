@@ -1,0 +1,10 @@
+node_modules/
+minecraft_test/
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.tmp
+__pycache__/
+*.pyc
