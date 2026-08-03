@@ -50,37 +50,12 @@ await launcher.launch();
 
 #### 通过Git Submodule集成
 ```bash
-# 添加为子模块
-git submodule add https://github.com/yourusername/mc-launcher-core.git libs/mc-launcher-core
-```
-
-#### 通过CDN集成
-```html
-<script src="https://cdn.jsdelivr.net/npm/mc-launcher-core/dist/mc-launcher.min.js"></script>
-```
-
-
-## 项目结构
-
-```
-mc_launcher_core/
-├── src/
-│   ├── auth/              # 认证模块
-│   │   ├── offline/       # 离线登录
-│   │   └── microsoft/     # Microsoft账户登录
-│   ├── game/             # 游戏启动管理
-│   │   ├── version.js    # 版本管理
-│   │   └── assets.js     # 资源管理
-│   ├── mods/             # mod管理（预留）
-│   ├── servers/          # 服务端管理（预留）
-│   └── utils/            # 工具函数
-├── examples/             # 示例代码
-└── docs/                # 文档
+git submodule add https://github.com/ted-li-git/MC_launcher_core.git
 ```
 
 ## 文档链接
 - [快速简单开始文档](fasteasyguide.md)
-- [API文档](api.md)
+- [API文档](API.md)
 
 **docs目录下的集成指南部分引用方式可能过时，以 API.md 和 fasteasyguide.md 为准**
 
