@@ -1,6 +1,6 @@
 # Minecraft Launcher Core
 
-MC Launcher Core（MCLC）：打破中文开源社区的宁静，跨平台MC启动脚本，为每一个自研启动器打好最坚强的启动。
+MC Launcher Core（MCLC）：打破中文开源社区的宁静，跨平台MC启动脚本，为每一个自研启动器打好最坚强的启动模块。
 
 ## 使用前注意
 
