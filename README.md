@@ -1,12 +1,8 @@
-# Infinite Minecraft Launcher Core
-
-Infinite MC Launcher Core（IMCLC）：打破中文开源社区的宁静，跨平台MC启动脚本，为每一个自研启动器打好最坚强的启动模块。
-=======
 # Infinite MC Launcher Core
 
 > MC的世界，永无止境。
 
-Infinite MC Launcher Core（IMC）：跨平台 Minecraft 启动器核心库，为每一个自研启动器打好最坚强的启动。支持原版与 Forge（1.12.2 - 1.21.1），可被 Python / C# / C++ 等任意语言一键调用。
+Infinite MC Launcher Core（IMCLC）：跨平台 Minecraft 启动器核心库，为每一个自研启动器打好最坚强的启动。支持原版与 Forge（1.12.2 - 1.21.1），可被 Python / C# / C++ 等任意语言一键调用。
 
 ## 使用前注意
 
