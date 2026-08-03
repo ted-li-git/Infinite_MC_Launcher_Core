@@ -4,7 +4,7 @@ MC Launcher Core（MCLC）：打破中文开源社区的宁静，跨平台MC启�
 
 ## 使用前注意
 
-**本项目目前为Alpha版本，未经过完整测试，不建议在生产环境中使用。**  
+**本项目目前为Alpha版本，会有很多很多bug，未经过完整测试，不建议在生产环境中使用。**  
 请理性反馈问题，开发者会尽快修复。
 
 ## 功能特性
@@ -33,7 +33,6 @@ import { MCLauncher } from './src/index.js';
 const launcher = new MCLauncher({
     gameDirectory: './minecraft', //路径
     javaPath: 'java', //Java路径
-    minecraftPath: 'minecraft', //Minecraft路径
     version: '1.20.1' //游戏版本
 });
 
