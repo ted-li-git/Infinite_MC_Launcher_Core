@@ -29,7 +29,7 @@ Infinite MC Launcher Core（IMC）：跨平台 Minecraft 启动器核心库，�
 ### 安装
 ```bash
 # 下载此项目
-git clone https://github.com/ted-li-git/infinite-mc-launcher-core.git
+git clone https://github.com/ted-li-git/Infinite_MC_Launcher_Core.git
 ```
 
 ### 基本使用
@@ -57,7 +57,7 @@ await launcher.launch();
 #### 通过Git Submodule集成
 ```bash
 # 添加为子模块
-git submodule add https://github.com/ted-li-git/infinite-mc-launcher-core.git libs/infinite-mc-core
+git submodule add https://github.com/ted-li-git/Infinite_MC_Launcher_Core.git libs/infinite-mc-core
 ```
 
 ## 文档链接

@@ -26,12 +26,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ted-li-git/infinite-mc-launcher-core.git"
+    "url": "git+https://github.com/ted-li-git/Infinite_MC_Launcher_Core.git"
   },
   "bugs": {
-    "url": "https://github.com/ted-li-git/infinite-mc-launcher-core/issues"
+    "url": "https://github.com/ted-li-git/Infinite_MC_Launcher_Core/issues"
   },
-  "homepage": "https://github.com/ted-li-git/infinite-mc-launcher-core#readme",
+  "homepage": "https://github.com/ted-li-git/Infinite_MC_Launcher_Core#readme",
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^15.0.0",
     "@rollup/plugin-commonjs": "^25.0.0",
