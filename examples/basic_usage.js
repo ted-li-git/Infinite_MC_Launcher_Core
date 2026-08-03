@@ -1,12 +1,12 @@
 /**
- * MC Launcher Core - 基本使用示例
+ * Infinite MC Launcher Core - 基本使用示例
  * 展示如何使用启动模块进行离线登录和游戏启动
  */
 
 import { MCLauncher } from '../src/index.js';
 
 async function basicExample() {
-    console.log('=== MC Launcher Core 基本使用示例 ===\n');
+    console.log('=== Infinite MC Launcher Core 基本使用示例 ===\n');
     
     // 1. 创建启动器实例
     console.log('1. 创建启动器实例...');

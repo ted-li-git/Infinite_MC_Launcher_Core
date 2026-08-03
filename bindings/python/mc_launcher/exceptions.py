@@ -1,4 +1,4 @@
-"""MC Launcher 异常定义"""
+"""Infinite MC Launcher 异常定义"""
 
 
 class LauncherError(Exception):

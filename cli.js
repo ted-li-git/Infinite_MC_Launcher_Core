@@ -194,7 +194,7 @@ async function handleStdio(options) {
         }
     };
 
-    sendEvent('ready', { message: 'MC Launcher stdio mode ready' });
+    sendEvent('ready', { message: 'Infinite MC Launcher stdio mode ready' });
 
     rl.on('line', line => {
         let msg;
@@ -257,7 +257,7 @@ async function main() {
 
 function showHelp() {
     console.log(`
-MC Launcher Core CLI
+Infinite MC Launcher Core CLI
 
 用法:
   node cli.js <command> [options]

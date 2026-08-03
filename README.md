@@ -1,6 +1,14 @@
+<<<<<<< HEAD
 # Infinite Minecraft Launcher Core
 
 Infinite MC Launcher Core（IMCLC）：打破中文开源社区的宁静，跨平台MC启动脚本，为每一个自研启动器打好最坚强的启动模块。
+=======
+# Infinite MC Launcher Core
+
+> MC的世界，永无止境。
+
+Infinite MC Launcher Core（IMC）：跨平台 Minecraft 启动器核心库，为每一个自研启动器打好最坚强的启动。支持原版与 Forge（1.12.2 - 1.21.1），可被 Python / C# / C++ 等任意语言一键调用。
+>>>>>>> ab8808f (Rename to Infinite MC Launcher Core + add .NET guide and TESTED.md)
 
 ## 使用前注意
 
@@ -23,7 +31,7 @@ Infinite MC Launcher Core（IMCLC）：打破中文开源社区的宁静，跨�
 ### 安装
 ```bash
 # 下载此项目
-git clone https://github.com/ted-li-git/MC_launcher_core.git
+git clone https://github.com/ted-li-git/infinite-mc-launcher-core.git
 ```
 
 ### 基本使用
@@ -50,12 +58,47 @@ await launcher.launch();
 
 #### 通过Git Submodule集成
 ```bash
+<<<<<<< HEAD
 git submodule add https://github.com/ted-li-git/MC_launcher_core.git
+=======
+# 添加为子模块
+git submodule add https://github.com/ted-li-git/infinite-mc-launcher-core.git libs/infinite-mc-core
+```
+
+#### 通过CDN集成
+```html
+<script src="https://cdn.jsdelivr.net/npm/infinite-mc-core/dist/mc-launcher.min.js"></script>
+```
+
+
+## 项目结构
+
+```
+infinite-mc-launcher-core/
+├── src/
+│   ├── auth/              # 认证模块
+│   │   ├── offline/       # 离线登录
+│   │   └── microsoft/     # Microsoft账户登录
+│   ├── game/             # 游戏启动管理
+│   │   ├── version.js    # 版本管理
+│   │   └── assets.js     # 资源管理
+│   ├── mods/             # mod管理（预留）
+│   ├── servers/          # 服务端管理（预留）
+│   └── utils/            # 工具函数
+├── examples/             # 示例代码
+└── docs/                # 文档
+>>>>>>> ab8808f (Rename to Infinite MC Launcher Core + add .NET guide and TESTED.md)
 ```
 
 ## 文档链接
 - [快速简单开始文档](fasteasyguide.md)
+<<<<<<< HEAD
 - [API文档](API.md)
+=======
+- [API文档](api.md)
+- [.NET 集成指南](docs/DOTNET_GUIDE.md)
+- [集成指南](docs/INTEGRATION_GUIDE.md)
+>>>>>>> ab8808f (Rename to Infinite MC Launcher Core + add .NET guide and TESTED.md)
 
 **docs目录下的集成指南部分引用方式可能过时，以 API.md 和 fasteasyguide.md 为准**
 

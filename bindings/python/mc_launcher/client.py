@@ -1,4 +1,4 @@
-"""MC Launcher Core Python SDK 客户端"""
+"""Infinite MC Launcher Core Python SDK 客户端"""
 
 import json
 import subprocess

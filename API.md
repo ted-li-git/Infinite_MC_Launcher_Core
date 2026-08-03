@@ -1,11 +1,11 @@
-# MC Launcher Core API 文档
+# Infinite MC Launcher Core API 文档
 
-Minecraft 启动器核心库，提供一键启动、版本管理、认证、Java 自动检测等功能。
+Infinite MC Launcher Core —— 跨平台 Minecraft 启动器核心库，提供一键启动、版本管理、认证、Java 自动检测等功能。
 
 ## 快速开始
 
 ```javascript
-import { MCLauncher } from 'mc-launcher-core';
+import { MCLauncher } from 'infinite-mc-core';
 
 const launcher = new MCLauncher({
     gameDirectory: './minecraft',
@@ -140,7 +140,7 @@ launcher.cleanup();
 ### OfflineAuth
 
 ```javascript
-import { OfflineAuth } from 'mc-launcher-core';
+import { OfflineAuth } from 'infinite-mc-core';
 
 const auth = new OfflineAuth({ enableDebug: true });
 const profile = await auth.authenticate('Player1');
@@ -149,7 +149,7 @@ const profile = await auth.authenticate('Player1');
 ### MicrosoftAuth
 
 ```javascript
-import { MicrosoftAuth } from 'mc-launcher-core';
+import { MicrosoftAuth } from 'infinite-mc-core';
 
 const auth = new MicrosoftAuth({ enableDebug: true });
 const profile = await auth.authenticate(accessToken);
@@ -158,7 +158,7 @@ const profile = await auth.authenticate(accessToken);
 ### MojangAuth
 
 ```javascript
-import { MojangAuth } from 'mc-launcher-core';
+import { MojangAuth } from 'infinite-mc-core';
 
 const auth = new MojangAuth({ enableDebug: true });
 const profile = await auth.authenticate(username, password);
@@ -169,7 +169,7 @@ const profile = await auth.authenticate(username, password);
 ### VersionManager
 
 ```javascript
-import { VersionManager } from 'mc-launcher-core';
+import { VersionManager } from 'infinite-mc-core';
 
 const vm = new VersionManager('./minecraft');
 
@@ -198,7 +198,7 @@ const args = await vm.generateLaunchArgs({
 ## Java 自动检测
 
 ```javascript
-import { findJava, detectJavaVersions, getJavaVersion } from 'mc-launcher-core';
+import { findJava, detectJavaVersions, getJavaVersion } from 'infinite-mc-core';
 
 // 扫描系统中所有 Java 安装
 const javas = await detectJavaVersions();
@@ -216,7 +216,7 @@ const version = await getJavaVersion('java');
 ## 日志系统
 
 ```javascript
-import { Logger, LogLevel } from 'mc-launcher-core';
+import { Logger, LogLevel } from 'infinite-mc-core';
 
 const logger = new Logger(true); // 启用调试
 
@@ -288,7 +288,7 @@ launcher.logger.onLog((entry) => {
 ## 完整示例
 
 ```javascript
-import { MCLauncher } from 'mc-launcher-core';
+import { MCLauncher } from 'infinite-mc-core';
 
 async function main() {
     const launcher = new MCLauncher({

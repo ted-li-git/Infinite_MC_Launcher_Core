@@ -37,7 +37,7 @@ export class MCLauncher {
         this.serverManager = new ServerManager(this);
 
         this.config = loadConfig(this.options.gameDirectory);
-        this.logger.info('MC Launcher initialized', this.options);
+        this.logger.info('Infinite MC Launcher initialized', this.options);
     }
 
     async _login(AuthClass, label, ...args) {

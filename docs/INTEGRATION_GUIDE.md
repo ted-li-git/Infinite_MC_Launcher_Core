@@ -1,21 +1,21 @@
-# MC Launcher Core 集成指南
+# Infinite MC Launcher Core 集成指南
 
 ## 概述
 
-MC Launcher Core 是一个功能完整的Minecraft启动模块，支持离线登录和Microsoft正版登录。本指南将帮助你快速集成到你的项目中。
+Infinite MC Launcher Core 是一个功能完整的Minecraft启动模块，支持离线登录和Microsoft正版登录。本指南将帮助你快速集成到你的项目中。
 
 ## 集成方式
 
 ### 1. 通过NPM安装（推荐）
 
 ```bash
-npm install mc-launcher-core
+npm install infinite-mc-core
 # 或
-yarn add mc-launcher-core
+yarn add infinite-mc-core
 ```
 
 ```javascript
-import { MCLauncher } from 'mc-launcher-core';
+import { MCLauncher } from 'infinite-mc-core';
 
 const launcher = new MCLauncher({
     gameDirectory: './minecraft',
@@ -27,7 +27,7 @@ const launcher = new MCLauncher({
 
 ```bash
 # 添加为子模块
-git submodule add https://github.com/yourusername/mc-launcher-core.git libs/mc-launcher-core
+git submodule add https://github.com/ted-li-git/infinite-mc-launcher-core.git libs/infinite-mc-core
 
 # 更新子模块
 git submodule update --init --recursive
@@ -36,7 +36,7 @@ git submodule update --init --recursive
 ### 3. 通过CDN使用
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/mc-launcher-core/dist/mc-launcher.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/infinite-mc-core/dist/mc-launcher.min.js"></script>
 <script>
     const { MCLauncher } = window.MCLauncherCore;
     
@@ -52,7 +52,7 @@ git submodule update --init --recursive
 ### 基本使用
 
 ```javascript
-import { MCLauncher } from 'mc-launcher-core';
+import { MCLauncher } from 'infinite-mc-core';
 
 async function basicLaunch() {
     // 1. 创建启动器
@@ -278,7 +278,7 @@ gameProcess.on('error', (error) => {
 ### 自定义认证提供者
 
 ```javascript
-import { MCLauncher, OfflineAuth } from 'mc-launcher-core';
+import { MCLauncher, OfflineAuth } from 'infinite-mc-core';
 
 class CustomAuth extends OfflineAuth {
     async authenticate(username) {
@@ -309,7 +309,7 @@ launcher.auth = new CustomAuth();
 ```javascript
 // Electron示例
 const { app, BrowserWindow, ipcMain } = require('electron');
-const { MCLauncher } = require('mc-launcher-core');
+const { MCLauncher } = require('infinite-mc-core');
 
 let launcher;
 
@@ -466,7 +466,7 @@ launcher.versionManager.on('download-progress', (progress) => {
 ### 添加新的认证方式
 ```javascript
 // 扩展认证基类
-import { BaseAuth } from 'mc-launcher-core/src/auth/base.js';
+import { BaseAuth } from 'infinite-mc-core/src/auth/base.js';
 
 class CustomAuth extends BaseAuth {
     async authenticate(credentials) {

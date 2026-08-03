@@ -64,7 +64,7 @@ Java HotSpot(TM) 64-Bit Server VM 18.9 (build 11.0.26+7-LTS-187, mixed mode)
 ### 选项 A：你懂 Python
 
 ```bash
-cd mc_launcher_core
+cd infinite-mc-launcher-core
 
 pip install -e bindings/python
 
@@ -76,7 +76,7 @@ from mc_launcher import MCLauncher
 launcher = MCLauncher(
     game_dir=r'C:\Users\你的用户名\AppData\Roaming\.minecraft',
     node_path='node',  # Node.js 的路径
-    cli_path=r'D:\mc_launcher_core\cli.js'  # cli.js 的完整路径
+    cli_path=r'D:\infinite-mc-launcher-core\cli.js'  # cli.js 的完整路径
 )
 
 result = launcher.launch(
@@ -264,7 +264,7 @@ A: 已修复。如果还出现，确认你用的是最新代码。
 
 A: 需要先安装 Python SDK：
 ```bash
-cd mc_launcher_core
+cd infinite-mc-launcher-core
 pip install -e bindings/python
 ```
 

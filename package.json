@@ -1,7 +1,7 @@
 {
-  "name": "mc-launcher-core",
+  "name": "infinite-mc-core",
   "version": "1.0.0",
-  "description": "A Minecraft launcher module supporting offline and Microsoft authentication",
+  "description": "Infinite MC Launcher Core - 跨平台Minecraft启动器核心库，支持1.12.2-1.21.1原版与Forge",
   "main": "dist/mc-launcher.js",
   "module": "src/index.js",
   "type": "module",
@@ -15,21 +15,23 @@
   "keywords": [
     "minecraft",
     "launcher",
+    "infinite",
     "authentication",
     "offline",
     "microsoft",
-    "mojang"
+    "mojang",
+    "forge"
   ],
-  "author": "Your Name",
+  "author": "LJT",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/mc-launcher-core.git"
+    "url": "git+https://github.com/ted-li-git/infinite-mc-launcher-core.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/mc-launcher-core/issues"
+    "url": "https://github.com/ted-li-git/infinite-mc-launcher-core/issues"
   },
-  "homepage": "https://github.com/yourusername/mc-launcher-core#readme",
+  "homepage": "https://github.com/ted-li-git/infinite-mc-launcher-core#readme",
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^15.0.0",
     "@rollup/plugin-commonjs": "^25.0.0",

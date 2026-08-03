@@ -1,6 +1,6 @@
 /**
  * Rollup 构建配置
- * 用于打包MC Launcher Core模块
+ * 用于打包 Infinite MC Launcher Core 模块
  */
 
 import { nodeResolve } from '@rollup/plugin-node-resolve';
@@ -16,7 +16,7 @@ export default {
       exports: 'named',
       sourcemap: true,
       banner: `/**
- * MC Launcher Core v1.0.0
+ * Infinite MC Launcher Core v1.0.0
  * Minecraft启动模块
  * 支持离线登录和Microsoft认证
  * 
@@ -36,7 +36,7 @@ export default {
       plugins: [terser()],
       sourcemap: true,
       banner: `/**
- * MC Launcher Core v1.0.0 (minified)
+ * Infinite MC Launcher Core v1.0.0 (minified)
  * Minecraft启动模块
  * 
  * @license MIT

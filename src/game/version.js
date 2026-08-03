@@ -5,7 +5,7 @@ import path from 'path';
 
 const OS_NAME = { win32: 'windows', darwin: 'osx' }[process.platform] || 'linux';
 const MANIFEST_URL = 'https://launchermeta.mojang.com/mc/game/version_manifest.json';
-const LAUNCHER_NAME = 'MC Launcher Core';
+const LAUNCHER_NAME = 'Infinite MC Launcher Core';
 const LAUNCHER_VERSION = '1.0.0';
 
 export class VersionManager {

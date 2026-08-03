@@ -1,10 +1,10 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='mc-launcher-core',
+    name='infinite-mc-core',
     version='1.0.0',
-    description='Minecraft Launcher Python SDK - 通过 subprocess 调用 Node.js CLI',
-    author='MC Launcher Core',
+    description='Infinite MC Launcher Core Python SDK - 通过 subprocess 调用 Node.js CLI',
+    author='LJT',
     packages=find_packages(),
     python_requires='>=3.7',
     classifiers=[

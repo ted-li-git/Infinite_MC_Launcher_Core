@@ -1,4 +1,4 @@
-"""MC Launcher Core Python SDK
+"""Infinite MC Launcher Core Python SDK
 
 Minecraft 启动器 Python SDK，通过 subprocess 调用 Node.js CLI。
 支持简单调用和 stdio 事件回调两种模式。
