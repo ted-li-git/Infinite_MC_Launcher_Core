@@ -163,7 +163,7 @@ console.log(`📝 已更新 CHANGELOG.md`);
 run('npm run build', '构建 dist/');
 
 // 6. git 提交
-run(`git add package.json CHANGELOG.md dist/`, '暂存变更');
+run(`git add package.json CHANGELOG.md`, '暂存变更');
 run(`git commit -m "release: v${newVersion}"`, `提交 v${newVersion}`);
 run(`git tag v${newVersion}`, `打标签 v${newVersion}`);
 
