@@ -1,5 +1,5 @@
 /**
- * Infinite MC Launcher Core - npm 发布脚本
+ * Infinite MC Launcher Core - GitHub Packages 发布脚本
  * 用法:
  *   node scripts/publish.mjs patch   // 1.0.0 -> 1.0.1
  *   node scripts/publish.mjs minor   // 1.0.0 -> 1.1.0
@@ -129,11 +129,12 @@ if (status) {
     process.exit(1);
 }
 
-// 2. 检查 npm 登录状态
+// 2. 检查 GitHub Packages 认证
 try {
-    execSync('npm whoami', { cwd: root, stdio: 'pipe' });
+    execSync('npm whoami --registry=https://npm.pkg.github.com', { cwd: root, stdio: 'pipe' });
 } catch {
-    console.error('\n❌ 未登录 npm，请先运行: npm login');
+    console.error('\n❌ 未认证 GitHub Packages，请运行:');
+    console.error('   npm config set //npm.pkg.github.com/:_authToken <你的GitHub_Token>');
     process.exit(1);
 }
 
@@ -170,10 +171,10 @@ run(`git tag v${newVersion}`, `打标签 v${newVersion}`);
 // 7. 推送
 run('git push && git push --tags', '推送 git');
 
-// 8. npm 发布
-run('npm publish', '发布到 npm');
+// 8. 发布到 GitHub Packages
+run('npm publish', '发布到 GitHub Packages');
 
 console.log('\n═══════════════════════════════════════');
 console.log(`  ✅ v${newVersion} 发布成功！`);
-console.log(`  📦 https://www.npmjs.com/package/infinite-mc-core`);
+console.log(`  📦 https://github.com/ted-li-git/Infinite_MC_Launcher_Core/pkgs/npm/infinite-mc-launcher-core`);
 console.log('═══════════════════════════════════════\n');

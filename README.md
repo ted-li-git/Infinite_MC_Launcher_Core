@@ -24,14 +24,22 @@ Infinite MC Launcher Core（IMCLC）：跨平台 Minecraft 启动器核心库，
 
 ### 安装
 ```bash
-# 方式一：npm 直接从 GitHub 安装（推荐）
+# 方式一：通过 GitHub Packages 安装（推荐）
+npm install @ted-li-git/infinite-mc-launcher-core
+
+# 方式二：直接从 GitHub 仓库安装
 npm install github:ted-li-git/Infinite_MC_Launcher_Core
 
-# 方式二：克隆项目
+# 方式三：克隆项目
 git clone https://github.com/ted-li-git/Infinite_MC_Launcher_Core.git
 cd Infinite_MC_Launcher_Core
 npm install
 ```
+
+> 使用方式一前，需在项目根目录 `.npmrc` 中添加：
+> ```
+> @ted-li-git:registry=https://npm.pkg.github.com
+> ```
 
 ### 基本使用
 ```javascript
@@ -57,7 +65,7 @@ await launcher.launch();
 
 #### 通过 npm 安装
 ```bash
-npm install github:ted-li-git/Infinite_MC_Launcher_Core
+npm install @ted-li-git/infinite-mc-launcher-core
 ```
 
 #### 通过 Git Submodule 集成

@@ -1,5 +1,5 @@
 {
-    "name": "infinite-mc-core",
+    "name": "@ted-li-git/infinite-mc-launcher-core",
     "version": "1.0.0",
     "description": "Infinite MC Launcher Core - 跨平台Minecraft启动器核心库，支持1.12.2-1.21.1原版与Forge",
     "main": "dist/mc-launcher.js",
@@ -57,5 +57,8 @@
     },
     "engines": {
         "node": ">=18.0.0"
+    },
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com"
     }
 }
