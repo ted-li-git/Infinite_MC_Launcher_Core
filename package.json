@@ -1,60 +1,60 @@
 {
-  "name": "infinite-mc-core",
-  "version": "1.0.0",
-  "description": "Infinite MC Launcher Core - 跨平台Minecraft启动器核心库，支持1.12.2-1.21.1原版与Forge",
-  "main": "dist/mc-launcher.js",
-  "module": "src/index.js",
-  "type": "module",
-  "scripts": {
-    "build": "rollup -c",
-    "dev": "rollup -c -w",
-    "test": "jest",
-    "lint": "eslint src/**/*.js",
-    "prepublishOnly": "npm run build"
-  },
-  "keywords": [
-    "minecraft",
-    "launcher",
-    "infinite",
-    "authentication",
-    "offline",
-    "microsoft",
-    "mojang",
-    "forge"
-  ],
-  "author": "LJT",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ted-li-git/Infinite_MC_Launcher_Core.git"
-  },
-  "bugs": {
-    "url": "https://github.com/ted-li-git/Infinite_MC_Launcher_Core/issues"
-  },
-  "homepage": "https://github.com/ted-li-git/Infinite_MC_Launcher_Core#readme",
-  "devDependencies": {
-    "@rollup/plugin-node-resolve": "^15.0.0",
-    "@rollup/plugin-commonjs": "^25.0.0",
-    "rollup": "^3.0.0",
-    "@rollup/plugin-terser": "^0.4.4",
-    "eslint": "^8.0.0",
-    "jest": "^29.0.0"
-  },
-  "dependencies": {
-    "node-fetch": "^3.0.0",
-    "uuid": "^9.0.0"
-  },
-  "files": [
-    "dist",
-    "src",
-    "cli.js",
-    "README.md",
-    "LICENSE"
-  ],
-  "bin": {
-    "infinite-mc": "cli.js"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+    "name": "infinite-mc-core",
+    "version": "1.0.0",
+    "description": "Infinite MC Launcher Core - 跨平台Minecraft启动器核心库，支持1.12.2-1.21.1原版与Forge",
+    "main": "dist/mc-launcher.js",
+    "module": "src/index.js",
+    "type": "module",
+    "scripts": {
+        "build": "rollup -c",
+        "dev": "rollup -c -w",
+        "test": "jest",
+        "lint": "eslint src/**/*.js",
+        "prepublishOnly": "npm run build"
+    },
+    "keywords": [
+        "minecraft",
+        "launcher",
+        "infinite",
+        "authentication",
+        "offline",
+        "microsoft",
+        "mojang",
+        "forge"
+    ],
+    "author": "LJT",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/ted-li-git/Infinite_MC_Launcher_Core.git"
+    },
+    "bugs": {
+        "url": "https://github.com/ted-li-git/Infinite_MC_Launcher_Core/issues"
+    },
+    "homepage": "https://github.com/ted-li-git/Infinite_MC_Launcher_Core#readme",
+    "devDependencies": {
+        "@rollup/plugin-node-resolve": "^15.0.0",
+        "@rollup/plugin-commonjs": "^25.0.0",
+        "rollup": "^3.0.0",
+        "@rollup/plugin-terser": "^0.4.4",
+        "eslint": "^8.0.0",
+        "jest": "^29.0.0"
+    },
+    "dependencies": {
+        "node-fetch": "^3.0.0",
+        "uuid": "^9.0.0"
+    },
+    "files": [
+        "dist",
+        "src",
+        "cli.js",
+        "README.md",
+        "LICENSE"
+    ],
+    "bin": {
+        "infinite-mc": "cli.js"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
 }
