@@ -5,10 +5,10 @@ export class MicrosoftAuth {
     constructor(options = {}) {
         this.logger = new Logger(options.enableDebug);
         this.options = {
-            clientId: options.clientId || '00000000402b5328', // Mojang官方clientId
+            clientId: options.clientId || '00000000441cc96b', // Minecraft Nintendo Switch clientId
             redirectUri: options.redirectUri || 'https://login.live.com/oauth20_desktop.srf',
-            scope: options.scope || 'XboxLive.signin XboxLive.offline_access',
-            apiBase: options.apiBase || 'https://login.microsoftonline.com/consumers',
+            scope: options.scope || 'service::user.auth.xboxlive.com::MBI_SSL',
+            apiBase: options.apiBase || 'https://login.live.com',
             xboxApiBase: options.xboxApiBase || 'https://user.auth.xboxlive.com',
             minecraftApiBase: options.minecraftApiBase || 'https://api.minecraftservices.com',
             ...options
@@ -19,6 +19,7 @@ export class MicrosoftAuth {
         this.refreshToken = null;
         this.xboxTokens = null;
         this.minecraftToken = null;
+        this._deviceCookie = null;
     }
 
     async _postForm(url, params) {
@@ -39,14 +40,18 @@ export class MicrosoftAuth {
 
     async startDeviceFlow() {
         this.logger.info('Starting Microsoft device flow');
-        const response = await this._postForm(`${this.options.apiBase}/oauth2/v2.0/devicecode`, {
+        const response = await this._postForm(`${this.options.apiBase}/oauth20_connect.srf`, {
             client_id: this.options.clientId,
-            scope: this.options.scope
+            scope: this.options.scope,
+            response_type: 'device_code'
         });
         if (!response.ok) {
-            throw new Error(`Device code request failed: ${response.statusText}`);
+            const err = await response.json().catch(() => ({}));
+            throw new Error(`Device code request failed: ${err.error_description || response.statusText}`);
         }
         const data = await response.json();
+        // login.live.com 需要保存 cookie 用于后续 token 轮询
+        this._deviceCookie = response.headers.getSetCookie?.()?.map(v => v.split(';')[0]).join(';') || '';
         this.deviceCode = data;
         this.logger.info('Device code obtained', {
             deviceCode: data.device_code,
@@ -56,7 +61,7 @@ export class MicrosoftAuth {
             deviceCode: data.device_code,
             userCode: data.user_code,
             verificationUri: data.verification_uri,
-            verificationUriComplete: data.verification_uri_complete,
+            verificationUriComplete: data.verification_uri_complete || `https://microsoft.com/link?otc=${data.user_code}`,
             expiresIn: data.expires_in,
             interval: data.interval
         };
@@ -64,30 +69,34 @@ export class MicrosoftAuth {
 
     async checkDeviceAuthorization(deviceCode) {
         this.logger.debug('Checking device authorization status');
-        const response = await this._postForm(`${this.options.apiBase}/oauth2/v2.0/token`, {
-            grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-            device_code: deviceCode,
-            client_id: this.options.clientId
+        const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+        if (this._deviceCookie) headers['Cookie'] = this._deviceCookie;
+
+        const response = await fetch(`${this.options.apiBase}/oauth20_token.srf?client_id=${this.options.clientId}`, {
+            method: 'POST',
+            headers,
+            body: new URLSearchParams({
+                client_id: this.options.clientId,
+                device_code: deviceCode,
+                grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
+            }).toString()
         });
-        if (response.status === 400) {
-            const errorData = await response.json();
-            if (errorData.error === 'authorization_pending') {
+
+        const data = await response.json();
+        if (data.error) {
+            if (data.error === 'authorization_pending') {
                 this.logger.debug('Authorization pending');
                 return null;
             }
-            throw new Error(`Authorization error: ${errorData.error_description}`);
+            throw new Error(`Authorization error: ${data.error_description || data.error}`);
         }
-        if (!response.ok) {
-            throw new Error(`Token request failed: ${response.statusText}`);
-        }
-        const tokenData = await response.json();
-        this.accessToken = tokenData.access_token;
-        this.refreshToken = tokenData.refresh_token;
+        this.accessToken = data.access_token;
+        this.refreshToken = data.refresh_token;
         this.logger.info('Device authorization successful', {
             accessToken: this.accessToken?.substring(0, 20) + '...',
-            expiresIn: tokenData.expires_in
+            expiresIn: data.expires_in
         });
-        return tokenData;
+        return data;
     }
 
     async getXboxLiveToken(accessToken) {
@@ -96,7 +105,7 @@ export class MicrosoftAuth {
             Properties: {
                 AuthMethod: 'RPS',
                 SiteName: 'user.auth.xboxlive.com',
-                RpsTicket: `d=${accessToken}`
+                RpsTicket: `t=${accessToken}`
             },
             RelyingParty: 'http://auth.xboxlive.com',
             TokenType: 'JWT'
@@ -234,7 +243,7 @@ export class MicrosoftAuth {
 
     async refreshAccessToken(refreshToken) {
         this.logger.info('Refreshing Microsoft access token');
-        const response = await this._postForm(`${this.options.apiBase}/oauth2/v2.0/token`, {
+        const response = await this._postForm(`${this.options.apiBase}/oauth20_token.srf`, {
             grant_type: 'refresh_token',
             refresh_token: refreshToken,
             client_id: this.options.clientId

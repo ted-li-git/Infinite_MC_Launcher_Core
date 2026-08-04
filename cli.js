@@ -97,6 +97,41 @@ const handleCheck = (options, useJson) => {
 
 const handleJava = async () => ({ success: true, javas: await detectJavaVersions(true) });
 
+async function handleLogin(options, useJson) {
+    const { MicrosoftAuth } = await import('./src/auth/microsoft.js');
+    const auth = new MicrosoftAuth();
+
+    // 1. 启动设备流，输出 URL 和 userCode
+    const deviceFlow = await auth.startDeviceFlow();
+    process.stdout.write(JSON.stringify({
+        event: 'device_code',
+        url: deviceFlow.verificationUriComplete,
+        userCode: deviceFlow.userCode,
+        expiresIn: deviceFlow.expiresIn
+    }) + '\n');
+
+    // 2. 轮询等待用户授权
+    let tokenData = null;
+    const startTime = Date.now();
+    const timeout = deviceFlow.expiresIn * 1000;
+    while (!tokenData && (Date.now() - startTime) < timeout) {
+        tokenData = await auth.checkDeviceAuthorization(deviceFlow.deviceCode);
+        if (!tokenData) {
+            await new Promise(r => setTimeout(r, (deviceFlow.interval || 5) * 1000));
+        }
+    }
+    if (!tokenData) throw new Error('设备代码已过期，请重新登录');
+
+    // 3. 完成认证，返回 Microsoft access token（可用于 launch --access-token）
+    const profile = await auth.authenticate(auth.accessToken);
+    return {
+        success: true,
+        username: profile.username,
+        uuid: profile.uuid,
+        accessToken: auth.accessToken
+    };
+}
+
 async function handleLaunch(options, useJson) {
     requireVersion(options);
     const launcher = createLauncher(options, useJson);
@@ -235,6 +270,7 @@ async function main() {
             case 'launch': result = await handleLaunch(options, useJson); break;
             case 'check': result = await handleCheck(options, useJson); break;
             case 'java': result = await handleJava(); break;
+            case 'login': result = await handleLogin(options, useJson); break;
             case 'help':
             case '--help':
             case '-h':
@@ -268,6 +304,7 @@ Infinite MC Launcher Core CLI
   versions   列出可用版本
   check      检查版本完整性
   java       检测系统 Java 安装
+  login      正版登录（Microsoft 设备流认证）
   stdio      进入 stdio 交互模式（JSON-RPC）
 
 选项:
