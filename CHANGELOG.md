@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.0 (2026-08-04)
+## v1.0.0 Alpha (2026-08-04)
 
 ### 修复
 - remove dist from git add in publish script
