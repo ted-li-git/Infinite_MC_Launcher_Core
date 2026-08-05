@@ -76,7 +76,6 @@ git submodule add https://github.com/ted-li-git/Infinite_MC_Launcher_Core.git li
 ## 文档链接
 - [快速简单开始文档](fasteasyguide.md)
 - [API文档](API.md)
-- [API文档](api.md)
 - [.NET 集成指南](docs/DOTNET_GUIDE.md)
 - [集成指南](docs/INTEGRATION_GUIDE.md)
 
