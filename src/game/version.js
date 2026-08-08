@@ -18,6 +18,7 @@ export class VersionManager {
         this.ensureDirectories().catch(err => this.logger.warn('Directories creation skipped:', err.message));
         this.versionsCache = null;
         this.lastFetchTime = null;
+        this._versionJsonCache = new Map(); // 版本 JSON 内存缓存
     }
 
     async ensureDirectories() {
@@ -122,20 +123,27 @@ export class VersionManager {
             return { complete: false, missing };
         }
 
-        // 有 inheritsFrom 时检查父版本的 jar
+        // 收集需要检查的文件
+        const checks = [];
         const jarVersionId = versionData.inheritsFrom || versionId;
-        const jarPath = path.join(this.versionsDirectory, jarVersionId, `${jarVersionId}.jar`);
-        if (!(await this._exists(jarPath))) {
-            missing.push(`versions/${jarVersionId}/${jarVersionId}.jar`);
-        }
+        checks.push({ path: path.join(this.versionsDirectory, jarVersionId, `${jarVersionId}.jar`), name: `versions/${jarVersionId}/${jarVersionId}.jar` });
 
         for (const library of versionData.libraries || []) {
             if (library.rules && !this.evaluateRules(library.rules)) continue;
             if (library.downloads?.artifact || library.name) {
-                if (!(await this._exists(this.getLibraryPath(library)))) {
-                    missing.push(`libraries/${library.name}`);
-                }
+                checks.push({ path: this.getLibraryPath(library), name: `libraries/${library.name}` });
             }
+        }
+
+        // 分批并行检查（每批 16 个）
+        const BATCH = 16;
+        for (let i = 0; i < checks.length; i += BATCH) {
+            const batch = checks.slice(i, i + BATCH);
+            const results = await Promise.all(batch.map(async c => {
+                try { await fs.access(c.path); return null; }
+                catch { return c.name; }
+            }));
+            for (const r of results) if (r) missing.push(r);
         }
 
         this.logger.debug(`Integrity check for ${versionId}: ${missing.length === 0 ? 'OK' : `${missing.length} missing`}`);
@@ -268,11 +276,16 @@ export class VersionManager {
     async generateLaunchArgs(options) {
         this.logger.info(`Generating launch args for version ${options.version}`);
         const versionId = options.version;
-        const versionJsonPath = path.join(this.versionsDirectory, versionId, `${versionId}.json`);
 
-        let versionData = JSON.parse(await fs.readFile(versionJsonPath, 'utf8'));
-        if (versionData.inheritsFrom) {
-            versionData = await this._mergeParentVersion(versionData);
+        // 使用内存缓存避免重复解析 JSON
+        let versionData = this._versionJsonCache.get(versionId);
+        if (!versionData) {
+            const versionJsonPath = path.join(this.versionsDirectory, versionId, `${versionId}.json`);
+            versionData = JSON.parse(await fs.readFile(versionJsonPath, 'utf8'));
+            if (versionData.inheritsFrom) {
+                versionData = await this._mergeParentVersion(versionData);
+            }
+            this._versionJsonCache.set(versionId, versionData);
         }
 
         await this.extractNatives(versionData);
@@ -334,7 +347,21 @@ export class VersionManager {
         }
         this.nativesDirectory = nativesDir;
 
-        // 清空旧的 natives 文件，避免干扰
+        // 检查是否已提取过（通过标记文件）
+        const markerPath = path.join(nativesDir, '.extracted');
+        const libHash = (versionData.libraries || [])
+            .filter(l => l.natives)
+            .map(l => l.name)
+            .join('|');
+        try {
+            const marker = await fs.readFile(markerPath, 'utf8');
+            if (marker === libHash) {
+                this.logger.debug('Natives already extracted, skipping');
+                return;
+            }
+        } catch { /* 需要重新提取 */ }
+
+        // 清空旧的 natives 文件
         try {
             for (const file of await fs.readdir(nativesDir)) {
                 await fs.unlink(path.join(nativesDir, file));
@@ -350,7 +377,6 @@ export class VersionManager {
             if (!library.natives) continue;
             let nativeKey = library.natives[platform];
             if (!nativeKey) continue;
-            // 老版本 natives 字段可能包含 ${arch}
             nativeKey = nativeKey.replace('${arch}', process.arch === 'x64' ? '64' : '32');
 
             let nativeJarPath = null;
@@ -375,6 +401,9 @@ export class VersionManager {
                 this.logger.warn(`Failed to extract natives from ${nativeJarPath}: ${extractError.message}`);
             }
         }
+
+        // 写入标记文件
+        try { await fs.writeFile(markerPath, libHash); } catch {}
         this.logger.info('Natives extracted successfully');
     }
 
@@ -386,20 +415,31 @@ export class VersionManager {
     }
 
     async buildClassPath(versionData, versionId) {
-        const entries = [];
         const jarVersionId = versionData.inheritsFrom || versionId;
-        entries.push(path.join(this.versionsDirectory, jarVersionId, `${jarVersionId}.jar`));
+        const entries = [path.join(this.versionsDirectory, jarVersionId, `${jarVersionId}.jar`)];
 
+        // 收集需要检查的库
+        const toCheck = [];
         for (const library of versionData.libraries || []) {
             if (library.rules && !this.evaluateRules(library.rules)) continue;
             if (library.downloads?.artifact) {
                 entries.push(this.getLibraryPath(library));
             } else if (library.name) {
-                const libPath = this.getLibraryPath(library);
-                if (await this._exists(libPath)) entries.push(libPath);
-                else this.logger.debug(`Library not found, skipping: ${library.name}`);
+                toCheck.push({ path: this.getLibraryPath(library), name: library.name });
             }
         }
+
+        // 并行检查文件存在性
+        if (toCheck.length > 0) {
+            const results = await Promise.all(
+                toCheck.map(async c => {
+                    try { await fs.access(c.path); return c.path; }
+                    catch { this.logger.debug(`Library not found, skipping: ${c.name}`); return null; }
+                })
+            );
+            for (const r of results) if (r) entries.push(r);
+        }
+
         return entries.join(process.platform === 'win32' ? ';' : ':');
     }
 

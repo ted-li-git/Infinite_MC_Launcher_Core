@@ -7,6 +7,7 @@ import { ModManager } from '../mods/manager.js';
 import { ServerManager } from '../servers/manager.js';
 import { Logger } from '../utils/logger.js';
 import { saveConfig, loadConfig } from '../utils/config.js';
+import { join } from 'path';
 
 export class MCLauncher {
     constructor(options = {}) {
@@ -21,10 +22,17 @@ export class MCLauncher {
             enableDebug: false,
             logLevel: null,
             instanceDir: null,
+            consoleLog: false,    // 默认不输出到控制台
+            logFile: null,        // 默认自动生成
             ...options
         };
 
-        this.logger = new Logger(this.options.enableDebug);
+        // 日志文件路径：默认 <gameDirectory>/logs/launcher.log
+        const logFile = this.options.logFile || join(this.options.gameDirectory, 'logs', 'launcher.log');
+        this.logger = new Logger(this.options.enableDebug, {
+            logFile,
+            console: this.options.consoleLog
+        });
         if (this.options.logLevel) this.logger.setLevel(this.options.logLevel);
         this.auth = null;
         this.profile = null;

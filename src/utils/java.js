@@ -1,14 +1,16 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { access, readdir } from 'fs/promises';
-import { join } from 'path';
-import { platform } from 'os';
+import { access, readdir, readFile, writeFile, mkdir } from 'fs/promises';
+import { join, dirname } from 'path';
+import { platform, homedir } from 'os';
 
 const execFileAsync = promisify(execFile);
 const isWin = platform() === 'win32';
 const isMac = platform() === 'darwin';
 
 let detectedJavaVersions = null;
+const CACHE_FILE = join(homedir(), '.infinite-mc', 'java_cache.json');
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
 
 const SEARCH_DIRS = isWin ? [
     'C:\\Program Files\\Java',
@@ -41,6 +43,23 @@ export async function getJavaVersion(javaPath) {
 export async function detectJavaVersions(forceRefresh = false) {
     if (detectedJavaVersions && !forceRefresh) return detectedJavaVersions;
 
+    // 尝试从文件缓存读取
+    if (!forceRefresh) {
+        try {
+            const cache = JSON.parse(await readFile(CACHE_FILE, 'utf8'));
+            if (cache.timestamp && Date.now() - cache.timestamp < CACHE_TTL) {
+                // 验证缓存中的路径仍然存在
+                const valid = await Promise.all(
+                    cache.versions.map(async j => {
+                        try { await access(j.path); return j; } catch { return null; }
+                    })
+                );
+                detectedJavaVersions = valid.filter(Boolean);
+                if (detectedJavaVersions.length > 0) return detectedJavaVersions;
+            }
+        } catch {}
+    }
+
     const results = [];
     const checked = new Set();
 
@@ -71,6 +90,13 @@ export async function detectJavaVersions(forceRefresh = false) {
     }
 
     detectedJavaVersions = results;
+
+    // 写入文件缓存
+    try {
+        await mkdir(dirname(CACHE_FILE), { recursive: true });
+        await writeFile(CACHE_FILE, JSON.stringify({ timestamp: Date.now(), versions: results }));
+    } catch {}
+
     return results;
 }
 

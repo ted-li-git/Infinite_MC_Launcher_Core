@@ -1,5 +1,5 @@
 import { createWriteStream, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 
 export const LogLevel = { ERROR: 0, WARN: 1, INFO: 2, DEBUG: 3 };
 
@@ -11,7 +11,7 @@ const COLORS = {
 const LEVEL_COLORS = { ERROR: COLORS.RED, WARN: COLORS.YELLOW, INFO: COLORS.GREEN, DEBUG: COLORS.GRAY };
 
 export class Logger {
-    constructor(enableDebug = false) {
+    constructor(enableDebug = false, options = {}) {
         this.enableDebug = enableDebug;
         this.logLevels = LogLevel;
         this.currentLevel = enableDebug ? LogLevel.DEBUG : LogLevel.INFO;
@@ -19,6 +19,26 @@ export class Logger {
         this.colors = { ...COLORS };
         this.listeners = [];
         this.fileStream = null;
+        this.consoleOutput = options.console ?? false; // 默认不输出到控制台
+
+        // 自动启用文件日志
+        const logFile = options.logFile;
+        if (logFile) {
+            this._enableFileLogging(logFile, options.append !== false);
+        }
+    }
+
+    _enableFileLogging(filePath, append = true) {
+        try {
+            mkdirSync(dirname(filePath), { recursive: true });
+            this.fileStream = createWriteStream(filePath, {
+                flags: append ? 'a' : 'w',
+                encoding: 'utf8'
+            });
+            this.fileStream.on('error', () => { this.fileStream = null; });
+        } catch {
+            this.fileStream = null;
+        }
     }
 
     getTimestamp() {
@@ -27,7 +47,6 @@ export class Logger {
 
     format(level, message, data) {
         let out = `[${this.getTimestamp()}] [${level}] ${message}`;
-        // null 和 undefined 都不追加
         if (data != null) {
             try {
                 out += `\n${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}`;
@@ -47,8 +66,16 @@ export class Logger {
     _output(level, message, data, consoleFn) {
         if (this.currentLevel < this.logLevels[level]) return;
         const logMessage = this.format(level, message, data);
-        consoleFn(this.colorize(level, logMessage));
 
+        // 仅在显式开启时输出到控制台
+        if (this.consoleOutput) {
+            consoleFn(this.colorize(level, logMessage));
+        }
+
+        // 写入文件
+        if (this.fileStream) this.fileStream.write(logMessage + '\n');
+
+        // 通知监听器
         const entry = {
             timestamp: new Date().toISOString(),
             level, message,
@@ -58,7 +85,6 @@ export class Logger {
         for (const listener of this.listeners) {
             try { listener(entry); } catch {}
         }
-        if (this.fileStream) this.fileStream.write(logMessage + '\n');
     }
 
     error(message, error = null) { this._output('ERROR', message, error, console.error); }
@@ -74,6 +100,9 @@ export class Logger {
     enableDebugMode() { this.enableDebug = true; this.currentLevel = this.logLevels.DEBUG; }
     disableDebugMode() { this.enableDebug = false; this.currentLevel = this.logLevels.INFO; }
 
+    enableConsole() { this.consoleOutput = true; }
+    disableConsole() { this.consoleOutput = false; }
+
     onLog(callback) {
         this.listeners.push(callback);
         return () => {
@@ -83,32 +112,18 @@ export class Logger {
     }
 
     enableFileLogging(filePath, options = {}) {
-        try {
-            mkdirSync(dirname(filePath), { recursive: true });
-            this.fileStream = createWriteStream(filePath, {
-                flags: options.append === false ? 'w' : 'a',
-                encoding: 'utf8'
-            });
-            this.fileStream.on('error', (err) => {
-                console.error(`[Logger] File logging error: ${err.message}`);
-                this.fileStream = null;
-            });
-            this.info(`File logging enabled: ${filePath}`);
-        } catch (error) {
-            this.error('Failed to enable file logging', error);
-        }
+        this._enableFileLogging(filePath, options.append !== false);
     }
 
     disableFileLogging() {
         if (this.fileStream) {
             this.fileStream.end();
             this.fileStream = null;
-            this.info('File logging disabled');
         }
     }
 
     createChild(prefix) {
-        const child = new Logger(this.enableDebug);
+        const child = new Logger(this.enableDebug, { console: this.consoleOutput });
         child.currentLevel = this.currentLevel;
         child.supportsColor = this.supportsColor;
         child.fileStream = this.fileStream;
@@ -162,6 +177,7 @@ export class Logger {
             enableDebug: this.enableDebug,
             supportsColor: this.supportsColor,
             fileLogging: !!this.fileStream,
+            consoleOutput: this.consoleOutput,
             listeners: this.listeners.length,
             timestamp: this.getTimestamp()
         };
@@ -170,8 +186,8 @@ export class Logger {
 
 let globalLogger = null;
 
-export function getLogger(enableDebug = false) {
-    if (!globalLogger) globalLogger = new Logger(enableDebug);
+export function getLogger(enableDebug = false, options = {}) {
+    if (!globalLogger) globalLogger = new Logger(enableDebug, options);
     return globalLogger;
 }
 
