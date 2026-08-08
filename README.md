@@ -12,7 +12,7 @@ Infinite MC Launcher Core（IMCLC）：跨平台 Minecraft 启动器核心库，
 ## 功能特性
 
 - 离线登录（已实测）
-- 正版登录Mojang/Microsoft账户验证（未实测）
+- 正版登录Mojang/Microsoft账户验证（已实测Microsoft登录）
 - 模块化设计，易于扩展
 - 预留mod管理接口
 - 预留服务端管理接口
