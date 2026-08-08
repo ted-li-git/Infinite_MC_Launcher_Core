@@ -1,6 +1,6 @@
 {
     "name": "@ted-li-git/infinite-mc-launcher-core",
-    "version": "1.0.0",
+    "version": "1.0.1-alpha.1",
     "description": "Infinite MC Launcher Core - 跨平台Minecraft启动器核心库，支持1.12.2-1.21.1原版与Forge",
     "main": "dist/mc-launcher.js",
     "module": "src/index.js",
