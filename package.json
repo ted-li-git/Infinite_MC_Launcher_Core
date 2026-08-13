@@ -1,7 +1,7 @@
 {
     "name": "@ted-li-git/infinite-mc-launcher-core",
-    "version": "1.0.1-alpha.2",
-    "description": "Infinite MC Launcher Core - 跨平台Minecraft启动器核心库，支持1.12.2-1.21.1原版与Forge",
+    "version": "1.0.2-alpha.3",
+    "description": "Infinite MC Launcher Core - 跨平台Minecraft启动器核心库，支持1.12.2-最新版本原版与Forge/NeoForge",
     "main": "dist/mc-launcher.js",
     "module": "src/index.js",
     "type": "module",
@@ -21,7 +21,8 @@
         "offline",
         "microsoft",
         "mojang",
-        "forge"
+        "forge",
+        "neoforge"
     ],
     "author": "LJT",
     "license": "MIT",

@@ -177,8 +177,9 @@ export class VersionManager {
         }
         this.logger.info(`Downloading library: ${library.name}`);
         await fs.mkdir(path.dirname(libraryPath), { recursive: true });
-        const response = await fetch(this.getLibraryUrl(library));
-        if (!response.ok) throw new Error(`Failed to download library: ${response.statusText}`);
+        const url = this.getLibraryUrl(library);
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Failed to download library ${library.name}: ${response.statusText} (url: ${url})`);
         await fs.writeFile(libraryPath, Buffer.from(await response.arrayBuffer()));
 
         const expectedSha1 = library.downloads?.artifact?.sha1;
@@ -197,13 +198,29 @@ export class VersionManager {
     }
 
     getLibraryPath(library) {
+        if (library.downloads?.artifact?.path) {
+            return path.join(this.librariesDirectory, library.downloads.artifact.path);
+        }
         const { baseParts, fileName } = this._parseLibName(library);
         return path.join(this.librariesDirectory, ...baseParts, fileName);
     }
 
     getLibraryUrl(library) {
+        if (library.downloads?.artifact?.url) {
+            return library.downloads.artifact.url;
+        }
         const { baseParts, fileName } = this._parseLibName(library);
-        return ['https://libraries.minecraft.net', ...baseParts, fileName].join('/');
+        const repo = this._getMavenRepo(library.name);
+        return [repo, ...baseParts, fileName].join('/');
+    }
+
+    _getMavenRepo(libName) {
+        if (libName.startsWith('net.neoforged')) return 'https://maven.neoforged.net/releases';
+        if (libName.startsWith('net.minecraftforge')) return 'https://maven.minecraftforge.net/releases';
+        if (libName.startsWith('org.lwjgl')) return 'https://libraries.lwjgl.org';
+        if (libName.startsWith('cpw.mods')) return 'https://maven.minecraftforge.net/releases';
+        if (libName.startsWith('net.fabricmc')) return 'https://maven.fabricmc.net';
+        return 'https://libraries.minecraft.net';
     }
 
     async calculateSHA1(filePath) {
@@ -449,6 +466,8 @@ export class VersionManager {
             launcher_name: LAUNCHER_NAME,
             launcher_version: LAUNCHER_VERSION,
             classpath,
+            library_directory: this.librariesDirectory,
+            classpath_separator: process.platform === 'win32' ? ';' : ':',
             auth_player_name: profile.username || 'Player',
             auth_uuid: profile.uuid || '00000000-0000-0000-0000-000000000000',
             auth_access_token: profile.accessToken || 'token',

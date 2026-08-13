@@ -16,11 +16,13 @@ const SEARCH_DIRS = isWin ? [
     'C:\\Program Files\\Java',
     'C:\\Program Files (x86)\\Java',
     'C:\\Program Files\\Microsoft',
+    'C:\\Program Files\\Microsoft\\jdk',
     'C:\\Program Files\\Eclipse Adoptium',
     'C:\\Program Files\\Amazon Corretto',
     'C:\\Program Files\\Zulu',
     'C:\\Program Files\\BellSoft',
-    'C:\\Program Files\\GraalVM'
+    'C:\\Program Files\\GraalVM',
+    'C:\\Program Files\\Semeru'
 ] : isMac ? ['/Library/Java/JavaVirtualMachines'] : ['/usr/lib/jvm', '/usr/java'];
 
 function javaPathInDir(searchDir, entry) {
