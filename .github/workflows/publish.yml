@@ -17,13 +17,26 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://npm.pkg.github.com'
 
       - run: npm ci
 
       - run: npm run build
 
-      - run: npm publish
+      - name: Check if version exists
+        id: check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@ted-li-git/infinite-mc-launcher-core@$VERSION" --registry https://npm.pkg.github.com > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Version $VERSION already published, skipping"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish
+        if: steps.check.outputs.exists != 'true'
+        run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
