@@ -461,6 +461,8 @@ export class VersionManager {
     }
 
     _buildVars(versionData, options, classpath, profile = {}) {
+        const gameDir = options.instanceDir || options.gameDirectory;
+        const isLegacyAssets = !versionData.assetIndex || versionData.assets === 'legacy' || versionData.assets === 'pre-1.6';
         return {
             natives_directory: this.nativesDirectory,
             launcher_name: LAUNCHER_NAME,
@@ -471,16 +473,22 @@ export class VersionManager {
             auth_player_name: profile.username || 'Player',
             auth_uuid: profile.uuid || '00000000-0000-0000-0000-000000000000',
             auth_access_token: profile.accessToken || 'token',
+            auth_session: profile.accessToken || 'token',
             clientid: '',
             auth_xuid: '',
+            user_properties: '{}',
             user_type: profile.type === 'microsoft' ? 'msa' : 'mojang',
             version_name: options.version,
-            game_directory: options.instanceDir || options.gameDirectory,
-            assets_root: path.join(options.gameDirectory, 'assets'),
-            assets_index_name: versionData.assetIndex?.id || versionData.assets || 'pre-1.6',
-            user_properties: '{}',
+            version_type: versionData.type || 'release',
+            game_directory: gameDir,
+            gameDir,
+            assets_root: isLegacyAssets ? path.join(gameDir, 'resources') : path.join(gameDir, 'assets'),
+            game_assets: isLegacyAssets ? path.join(gameDir, 'resources') : path.join(gameDir, 'assets/virtual/legacy'),
+            assets_index_name: versionData.assetIndex?.id || versionData.assets || 'legacy',
             resolution_width: options.windowWidth || 854,
-            resolution_height: options.windowHeight || 480
+            resolution_height: options.windowHeight || 480,
+            height: options.windowHeight || 480,
+            width: options.windowWidth || 854
         };
     }
 
@@ -510,7 +518,6 @@ export class VersionManager {
             const vars = this._buildVars(versionData, options, classpath, options.profile);
             jvmArgs.push(...this._processArgs(jvmArguments, vars));
         } else {
-            // 老版本格式（1.12.2 及更早）手动添加 natives 和 classpath
             jvmArgs.push(`-Djava.library.path=${this.nativesDirectory}`, '-cp', classpath);
         }
         return jvmArgs;
@@ -518,13 +525,37 @@ export class VersionManager {
 
     buildGameArgs(versionData, options) {
         const profile = options.profile || {};
-        const gameArguments = versionData.arguments?.game || versionData.minecraftArguments?.split(' ') || [];
+        let gameArguments;
+        if (versionData.arguments?.game) {
+            gameArguments = versionData.arguments.game;
+        } else if (typeof versionData.minecraftArguments === 'string') {
+            gameArguments = this._splitLegacyArgs(versionData.minecraftArguments);
+        } else {
+            gameArguments = [];
+        }
         const features = {
             is_demo: options.demo || false,
             has_custom_resolution: !!(options.windowWidth && options.windowHeight)
         };
         const vars = this._buildVars(versionData, options, null, profile);
         return this._processArgs(gameArguments, vars, features);
+    }
+
+    _splitLegacyArgs(argString) {
+        const tokens = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < argString.length; i++) {
+            const c = argString[i];
+            if (c === '"') { inQuotes = !inQuotes; continue; }
+            if (c === ' ' && !inQuotes) {
+                if (current) { tokens.push(current); current = ''; }
+            } else {
+                current += c;
+            }
+        }
+        if (current) tokens.push(current);
+        return tokens;
     }
 
     getStatus() {

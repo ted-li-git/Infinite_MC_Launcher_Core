@@ -22,7 +22,12 @@ const SEARCH_DIRS = isWin ? [
     'C:\\Program Files\\Zulu',
     'C:\\Program Files\\BellSoft',
     'C:\\Program Files\\GraalVM',
-    'C:\\Program Files\\Semeru'
+    'C:\\Program Files\\Semeru',
+    'C:\\Program Files (x86)\\Eclipse Adoptium',
+    'C:\\Program Files (x86)\\Amazon Corretto',
+    'C:\\Program Files (x86)\\Zulu',
+    'C:\\Program Files (x86)\\BellSoft',
+    'C:\\Program Files (x86)\\Semeru'
 ] : isMac ? ['/Library/Java/JavaVirtualMachines'] : ['/usr/lib/jvm', '/usr/java'];
 
 function javaPathInDir(searchDir, entry) {
@@ -123,4 +128,25 @@ export function clearJavaCache() {
     detectedJavaVersions = null;
 }
 
-export default { getJavaVersion, detectJavaVersions, findJava, clearJavaCache };
+export function getRequiredJavaVersion(versionData, versionId) {
+    if (versionData?.javaVersion?.majorVersion) {
+        return versionData.javaVersion.majorVersion;
+    }
+    const id = versionId || '';
+    const sub = /^1\.(\d+)/.exec(id);
+    if (sub) {
+        const subV = parseInt(sub[1]);
+        if (subV <= 6) return 6;
+        if (subV <= 8) return 8;
+        if (subV <= 16) return 8;
+        if (subV === 17) return 16;
+        if (subV <= 20) return 17;
+        return 21;
+    }
+    const mcMajor = parseInt(id.split('.')[0] || '0');
+    if (mcMajor >= 21) return 21;
+    if (mcMajor >= 18) return 17;
+    return 21;
+}
+
+export default { getJavaVersion, detectJavaVersions, findJava, clearJavaCache, getRequiredJavaVersion };

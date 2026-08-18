@@ -111,7 +111,7 @@ export class MCLauncher {
             windowHeight: this.options.windowHeight
         });
 
-        await this._checkJavaVersion(launchArgs.versionData);
+        await this._checkJavaVersion(launchArgs.versionData, version);
 
         if (this.options.enableMods) {
             launchArgs.args = [...launchArgs.args, ...await this.modManager.getLaunchArgs()];
@@ -121,10 +121,10 @@ export class MCLauncher {
         return launchArgs;
     }
 
-    async _checkJavaVersion(versionData) {
-        const requiredMajor = versionData.javaVersion?.majorVersion || 8;
+    async _checkJavaVersion(versionData, versionId) {
         try {
-            const { getJavaVersion, findJava } = await import('../utils/java.js');
+            const { getJavaVersion, findJava, getRequiredJavaVersion } = await import('../utils/java.js');
+            const requiredMajor = getRequiredJavaVersion(versionData, versionId);
             const currentVersion = await getJavaVersion(this.options.javaPath);
             if (currentVersion === null) {
                 this.logger.warn('Could not determine Java version, skipping check');
