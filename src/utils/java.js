@@ -133,6 +133,8 @@ export function getRequiredJavaVersion(versionData, versionId) {
         return versionData.javaVersion.majorVersion;
     }
     const id = versionId || '';
+
+    // 1.x 正式版 / 预发布 1.x-preN / 候选版 1.x-rcN
     const sub = /^1\.(\d+)/.exec(id);
     if (sub) {
         const subV = parseInt(sub[1]);
@@ -143,9 +145,27 @@ export function getRequiredJavaVersion(versionData, versionId) {
         if (subV <= 20) return 17;
         return 21;
     }
+
+    // 周构建快照格式：YYwWWx (如 26w4a, 24w10a, 21w44a)
+    const snap = /^(\d{2})w\d+[a-z]?$/i.exec(id);
+    if (snap) {
+        const yy = parseInt(snap[1]);
+        // 16w~20w → 1.10~1.16 era
+        if (yy <= 20) return 8;
+        // 21w → 1.17 era
+        if (yy === 21) return 16;
+        // 22w~23w → 1.18~1.20 era
+        if (yy <= 23) return 17;
+        // 24w+ → 1.20.5+ era
+        return 21;
+    }
+
+    // 新版纯主版本号格式（无 1. 前缀，如 26.1.2 / 26.0.1）
     const mcMajor = parseInt(id.split('.')[0] || '0');
     if (mcMajor >= 21) return 21;
     if (mcMajor >= 18) return 17;
+
+    // 无法识别的格式：默认用 Java 21（现代快照基本都带 javaVersion 字段，极少走到这里）
     return 21;
 }
 
