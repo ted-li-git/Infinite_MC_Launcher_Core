@@ -1,10 +1,10 @@
 import { OfflineAuth } from '../auth/offline.js';
 import { MicrosoftAuth } from '../auth/microsoft.js';
 import { MojangAuth } from '../auth/mojang.js';
+import { ThirdPartyAuth } from '../auth/thirdparty.js';
 import { VersionManager } from '../game/version.js';
 import { AssetManager } from '../game/assets.js';
 import { ModManager } from '../mods/manager.js';
-import { ServerManager } from '../servers/manager.js';
 import { Logger } from '../utils/logger.js';
 import { saveConfig, loadConfig } from '../utils/config.js';
 import { join } from 'path';
@@ -42,7 +42,6 @@ export class MCLauncher {
         this.assetManager = new AssetManager(this.options.gameDirectory);
         this.assetManager.logger = this.logger.createChild('AssetManager');
         this.modManager = new ModManager(this);
-        this.serverManager = new ServerManager(this);
 
         this.config = loadConfig(this.options.gameDirectory);
         this.logger.info('Infinite MC Launcher initialized', this.options);
@@ -60,6 +59,40 @@ export class MCLauncher {
     offlineLogin(username) { return this._login(OfflineAuth, 'Offline', username); }
     microsoftLogin(accessToken) { return this._login(MicrosoftAuth, 'Microsoft', accessToken); }
     mojangLogin(username, password) { return this._login(MojangAuth, 'Mojang', username, password); }
+
+    /**
+     * 第三方 Yggdrasil 登录（LittleSkin / BlessingSkin / 自定义皮肤站通用）
+     *
+     * 用法一：使用内置预设
+     *   launcher.thirdPartyLogin({ preset: 'littleskin', username, password })
+     *   preset 可选：littleskin / blessskin / unionpass
+     *
+     * 用法二：自定义站点
+     *   launcher.thirdPartyLogin({ authBase: 'https://your-skin.site/api/yggdrasil', username, password })
+     *
+     * 用法三：已有 accessToken 直接复用
+     *   launcher.thirdPartyLogin({ preset: 'littleskin', accessToken, clientToken })
+     */
+    async thirdPartyLogin(options) {
+        this.logger.info('Third-party login attempt', {
+            preset: options?.preset,
+            authBase: options?.authBase,
+            username: options?.username
+        });
+        const { preset, authBase, profileBase, siteName, username, password, accessToken, clientToken, ...rest } = options || {};
+        this.auth = new ThirdPartyAuth({ preset, authBase, profileBase, siteName, clientToken, ...rest });
+        const arg = accessToken && !username
+            ? { accessToken, clientToken: clientToken || this.auth.clientToken }
+            : { username, password };
+        this.profile = await this.auth.authenticate(arg);
+        this.logger.info('Third-party login successful', {
+            site: this.profile.siteName,
+            username: this.profile.username,
+            uuid: this.profile.uuid
+        });
+        this.saveProfile();
+        return this.profile;
+    }
 
     saveProfile() {
         if (!this.profile) return;
@@ -117,6 +150,14 @@ export class MCLauncher {
             launchArgs.args = [...launchArgs.args, ...await this.modManager.getLaunchArgs()];
         }
 
+        // 直连服务器参数
+        if (this.options.server) {
+            launchArgs.args.push('--server', this.options.server);
+            if (this.options.serverPort) {
+                launchArgs.args.push('--port', String(this.options.serverPort));
+            }
+        }
+
         this.logger.info('Launch preparation completed', launchArgs);
         return launchArgs;
     }
@@ -170,7 +211,8 @@ export class MCLauncher {
     }
 
     async quickLaunch(options = {}) {
-        const { version, username = 'Player', authType = 'offline', accessToken, password, ...rest } = options;
+        const { version, username = 'Player', authType = 'offline', accessToken, password,
+                preset, authBase, profileBase, siteName, clientToken, ...rest } = options;
         this.logger.info(`Quick launch: version=${version || this.options.version}, auth=${authType}, user=${username}`);
 
         // 1. 认证
@@ -182,8 +224,14 @@ export class MCLauncher {
         } else if (authType === 'mojang') {
             if (!username || !password) throw new Error('Mojang auth requires username and password');
             await this.mojangLogin(username, password);
+        } else if (authType === 'third-party' || authType === 'thirdParty' || authType === 'littleskin') {
+            await this.thirdPartyLogin({
+                preset: preset || (authType === 'littleskin' ? 'littleskin' : undefined),
+                authBase, profileBase, siteName,
+                username, password, accessToken, clientToken
+            });
         } else {
-            throw new Error(`Unknown auth type: ${authType}`);
+            throw new Error(`Unknown auth type: ${authType}. Supported: offline, microsoft, mojang, third-party, littleskin`);
         }
 
         // 2. 更新启动选项
@@ -192,13 +240,6 @@ export class MCLauncher {
 
         // 3. 启动（内部自动检查版本、检测 Java、准备参数）
         return this.launch();
-    }
-
-    async launchServer(serverConfig) {
-        this.logger.info('Starting server launch', serverConfig);
-        const serverProcess = await this.serverManager.startServer(serverConfig);
-        this.logger.info('Server launched successfully');
-        return serverProcess;
     }
 
     getStatus() {

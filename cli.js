@@ -31,6 +31,12 @@ function coerceOptions(options) {
     if (result['game-dir']) result.gameDirectory = result['game-dir'];
     if (result['java-path']) result.javaPath = result['java-path'];
     if (result['auth']) result.authType = result['auth'];
+    if (result['server-port']) result.serverPort = parseInt(result['server-port']);
+    if (result['auth-base']) result.authBase = result['auth-base'];
+    if (result['profile-base']) result.profileBase = result['profile-base'];
+    if (result['site-name']) result.siteName = result['site-name'];
+    if (result['client-token']) result.clientToken = result['client-token'];
+    if (result['access-token']) result.accessToken = result['access-token'];
     return result;
 }
 
@@ -148,7 +154,14 @@ async function handleLaunch(options, useJson) {
         password: options.password,
         memory: options.memory,
         windowWidth: options.windowWidth,
-        windowHeight: options.windowHeight
+        windowHeight: options.windowHeight,
+        preset: options.preset,
+        authBase: options.authBase,
+        profileBase: options.profileBase,
+        siteName: options.siteName,
+        clientToken: options.clientToken,
+        server: options.server,
+        serverPort: options.serverPort
     });
 
     proc.stdout?.on('data', data => {
@@ -210,7 +223,14 @@ async function handleStdio(options) {
                 password: params.password,
                 memory: params.memory,
                 windowWidth: params.windowWidth,
-                windowHeight: params.windowHeight
+                windowHeight: params.windowHeight,
+                preset: params.preset,
+                authBase: params.authBase,
+                profileBase: params.profileBase,
+                siteName: params.siteName,
+                clientToken: params.clientToken,
+                server: params.server,
+                serverPort: params.serverPort
             });
             proc.stdout?.on('data', data => sendEvent('game_stdout', data.toString()));
             proc.stderr?.on('data', data => sendEvent('game_stderr', data.toString()));
@@ -307,11 +327,18 @@ Infinite MC Launcher Core CLI
   login      正版登录（Microsoft 设备流认证）
   stdio      进入 stdio 交互模式（JSON-RPC）
 
-选项:
+基础选项:
   --game-dir <path>    游戏目录（默认 ./minecraft）
   --version <id>       游戏版本
   --username <name>    玩家用户名
-  --auth <type>        认证方式（offline/microsoft/mojang）
+  --password <pwd>     登录密码（mojang / 第三方登录用）
+  --access-token <t>   Access Token（microsoft / 第三方 token 登录用）
+  --auth <type>        认证方式：
+                         offline         离线（默认）
+                         microsoft       微软正版
+                         mojang          Mojang 账密
+                         third-party     第三方 Yggdrasil
+                         littleskin      LittleSkin 快捷方式
   --memory <size>      内存大小（如 2G）
   --java-path <path>   Java 路径
   --window-width <px>  窗口宽度
@@ -320,12 +347,34 @@ Infinite MC Launcher Core CLI
   --json               JSON 格式输出
   --stdio              stdio 交互模式
 
+直连服务器:
+  --server <host>      自动连接的服务器地址
+  --server-port <p>    服务器端口（默认 25565）
+
+第三方登录 (Yggdrasil / LittleSkin):
+  --preset <name>      预设站点：littleskin / blessskin / unionpass
+  --auth-base <url>    自定义 authserver 基址（不用 preset 时必填）
+  --profile-base <url> 自定义 sessionserver 基址（默认等于 authBase）
+  --site-name <text>   自定义站点显示名
+  --client-token <hex> 自定义 clientToken（省略则随机生成）
+
 示例:
   node cli.js versions --game-dir ./minecraft --json
   node cli.js install --version 1.20.1
   node cli.js launch --version 1.20.1 --username Player1 --auth offline
-  node cli.js java --json
-  node cli.js stdio
+
+  # LittleSkin 账密登录
+  node cli.js launch --version 1.20.1 --auth littleskin \
+      --username your_account --password your_password
+
+  # 自定义皮肤站账密登录
+  node cli.js launch --version 1.20.1 --auth third-party \
+      --auth-base https://your-skin.site/api/yggdrasil \
+      --username your_account --password your_password
+
+  # 直连服务器 + LittleSkin
+  node cli.js launch --version 1.20.1 --auth littleskin -u abc -p xxx \
+      --server mc.example.com --server-port 25565
 `);
 }
 
