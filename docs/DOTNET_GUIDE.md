@@ -1,7 +1,7 @@
 # .NET 调用指南
 
 > .NET 通过子进程调用 `node cli.js`，无需 JNI / COM。`CLI_PATH` = cli.js 完整路径。
-> 核心库当前版本：`v1.0.5-beta.3`，支持 MC 1.0 ~ 1.21.11 + 快照，第三方 Yggdrasil 登录（LittleSkin / BlessingSkin / UnionPass）。
+> 核心库当前版本：`v1.0.6-beta.4`，支持 MC 1.0 ~ 1.21.11 + 快照，原版 / Forge / NeoForge / Fabric，第三方 Yggdrasil 登录（LittleSkin / BlessingSkin / UnionPass）。
 
 ## 两种调用方式
 
@@ -93,7 +93,7 @@ await p.StandardInput.WriteLineAsync(
 
 | params 键 | 类型 | 说明 |
 |---|---|---|
-| `version` | `string` | MC 版本号（支持 `1.20.1`、`1.20.1-Forge_47.2.0`、`26w4a` 快照等） |
+| `version` | `string` | MC 版本号（支持 `1.20.1`、`1.20.1-Forge_47.2.0`、`26w4a` 快照、Fabric：`1.20.1-Fabric` / `1.20.1-Fabric_0.16.10` / `fabric-loader-0.16.10-1.20.1`） |
 | `username` | `string` | 玩家名 |
 | `memory` | `string` | 分配内存，如 `"2G"`、`"4096M"` |
 | `windowWidth` | `number` | 窗口宽度（像素） |
@@ -171,6 +171,8 @@ await p.StandardInput.WriteLineAsync(JsonSerializer.Serialize(req));
 | 命令 | 示例 |
 |---|---|
 | 启动（离线） | `node cli.js launch --version 1.21.1 --username Player --auth offline --game-dir "..."` |
+| **启动 Fabric（自动最新 Loader）** | `node cli.js launch --version 1.20.1-Fabric --username Player --game-dir "..."` |
+| **安装指定 Fabric Loader** | `node cli.js install --version fabric-loader-0.16.10-1.20.1 --game-dir "..."`（官方格式 Loader 在前） |
 | **启动 LittleSkin** | `node cli.js launch --version 1.20.1 --auth littleskin --username 账号 --password 密码 --game-dir "..."` |
 | **启动自定义皮肤站** | `node cli.js launch --version 1.21.1 --auth third-party --auth-base https://xxx/api/yggdrasil --username Player --access-token xxxxxxxx --game-dir "..."` |
 | **启动并直连服务器** | `node cli.js launch --version 1.20.1 --auth offline --username Player --server mc.hypixel.net --server-port 25565 --game-dir "..."` |

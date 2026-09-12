@@ -1,7 +1,7 @@
 # Fast Easy Guide - 小白入门指南
 
 > 这篇文档假设你**完全不懂 JavaScript**，也能用这个库做出一个能用的 MC 启动器。
-> 本文档 v1.0.5-beta.3 更新。
+> 本文档 v1.0.6-beta.4 更新。
 
 ---
 
@@ -20,6 +20,7 @@
 - 检查游戏文件是否完整，缺文件自动重新下载
 - 拼接正确的启动命令（几百个参数，各种变量替换）
 - 加载 Forge / NeoForge（inheritsFrom 自动合并）
+- **一键自动安装 Fabric**（写 `1.20.1-Fabric` 就行，自动下载 Loader，v1.0.6-beta.4 新增）
 - **自动登录 LittleSkin 等第三方皮肤站**（皮肤/披风直接生效，不用 authlib-injector）
 - **启动游戏后自动加入指定服务器**（跳过主菜单）
 - 兼容 **Minecraft 1.0 到最新版**（含快照、远古版本）
@@ -188,6 +189,40 @@ launcher.launch(version='1.21.1-Forge_52.1.8', username='玩家名')
 > **Mod 怎么加载？** 把 mod 的 `.jar` 丢到游戏的 `mods/` 文件夹里，Forge 会自动加载。
 > 如果你用 `--instance-dir` 版本独立目录，mod 要放到**那个独立目录下的 mods/**。
 
+### 🧵 启动 Fabric（轻量 Mod 加载器，✨ 自动安装）
+
+不用自己去官网下载 Fabric installer！版本名按下面写，核心库会自动从 Fabric 官方服务器下载 Loader 和所需的库：
+
+```bash
+# 最简单：游戏版本后加 -Fabric，自动选最新稳定版 Loader
+node cli.js launch --version "1.20.1-Fabric" --username 玩家名 --auth offline
+
+# 指定 Loader 版本（简写）
+node cli.js launch --version "1.20.1-Fabric_0.16.10" --username 玩家名 --auth offline
+
+# 官方标准写法（注意：Loader 版本在前，游戏版本在后，别写反！）
+node cli.js install --version "fabric-loader-0.16.10-1.20.1"
+```
+
+```javascript
+// Node.js
+const proc = await launcher.quickLaunch({
+    version: '1.20.1-Fabric',   // 自动安装 + 启动
+    authType: 'offline',
+    username: '玩家名'
+});
+```
+
+| 版本名写法 | 含义 |
+|---|---|
+| `1.20.1-Fabric` | 最新稳定 Loader（推荐，省心） |
+| `1.20.1-Fabric_0.16.10` | 指定 Loader 版本 |
+| `fabric-loader-0.16.10-1.20.1` | 官方标准格式（**Loader 版本在前**） |
+
+> - Fabric 支持 **Minecraft 1.14 及以上**（1.12.2 及更早没有官方 Fabric）。
+> - Fabric Mod 的 `.jar` 同样放进 `mods/`（或 `--instance-dir` 独立目录的 `mods/`）。
+> - Fabric 和 Forge 的 Mod **不通用**，下载 Mod 时认准 Fabric 版本。
+
 ### 📁 独立游戏目录（每个版本独立的存档/mod/config）
 
 像 PCL/HelloMC Launcher 那样，不同版本**不共享** mods 和 saves：
@@ -229,7 +264,7 @@ node cli.js check --version 1.20.1 --game-dir "游戏目录"
 
 | 参数 | 命令行（node cli.js launch） | Python `launcher.launch()` | 说明 |
 |---|---|---|---|
-| 游戏版本 | `--version 1.20.1` | `version='1.20.1'` | 必填。版本名/Forge版本名/快照名(如 26w4a) |
+| 游戏版本 | `--version 1.20.1` | `version='1.20.1'` | 必填。版本名/Forge版本名/快照名(如 26w4a)/Fabric(如 `1.20.1-Fabric`) |
 | 玩家名 | `--username 小明` | `username='小明'` | 离线/mojang/第三方账密登录用 |
 | 密码 | `--password xxx` | `password='xxx'` | 第三方/Mojang 账密登录 |
 | 登录方式 | `--auth xxx` | `auth_type='xxx'` | `offline`/`microsoft`/`mojang`/`third-party`/**`littleskin`** |
@@ -298,6 +333,17 @@ A: Mod 要放在对应版本**实际使用的那个** `mods/` 文件夹里。
 - 没有用 `--instance-dir` → 放在 `--game-dir` 的 `mods/`
 - 用了 `--instance-dir` → 放在 `--instance-dir` 的 `mods/`
 
+### Q: Fabric 安装报错 "No Fabric loader available" / 404
+
+A: 依次检查：
+1. **游戏版本是否 ≥ 1.14**：Fabric 官方只支持 1.14 及以上（含快照），1.12.2/1.7.10 没有 Fabric，请改用 Forge。
+2. **版本号有没有拼错**：标准写法 Loader 在前（`fabric-loader-0.16.10-1.20.1`），游戏版本在后；不确定就直接用简写 `1.20.1-Fabric` 让它自动选。
+3. **网络能否访问** `meta.fabricmc.net` 和 `maven.fabricmc.net`（大陆网络一般可直连，失败可挂代理重试）。
+
+### Q: Fabric 启动了但 Mod 不生效
+
+A: Fabric Mod 和 Forge Mod **不通用**。确认你下载的 Mod 文件标注了 **Fabric** 版本，并且放进了正确的 `mods/`（用了 `--instance-dir` 就放独立目录里）。另外 Fabric 模组常依赖 **Fabric API** 这个前置 Mod，需要一并放进 `mods/`。
+
 ### Q: 启动后显示"试玩模式"/"Demo Mode"（5 分钟就结束）
 
 A: 离线账号的 demo 模式 bug，v1.0.5-beta.3 后已修复。还出现请升级代码或手动把 `features.is_demo` 设为 false。
@@ -356,6 +402,7 @@ src/utils/                      ← Java 检测 / 日志 / UUID / 配置
 | 用 Node.js 启动 | `import { MCLauncher } from './src/index.js'` → `quickLaunch(...)` |
 | 加载 Mod | 把 `.jar` 丢进对应版本的 `mods/` 文件夹 |
 | 用 Forge/NeoForge | `--version` 写完整版本名（如 `1.20.1-Forge_47.4.20`） |
+| 用 Fabric（自动装） | `--version 1.20.1-Fabric`（或 `1.20.1-Fabric_0.16.10` 指定版本） |
 | 加大内存 | 加 `--memory 4G` / `--memory 8G` |
 | 版本独立存档/Mod | 加 `--instance-dir "独立目录路径"` |
 

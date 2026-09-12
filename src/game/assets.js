@@ -61,7 +61,19 @@ export class AssetManager {
 
     async _readVersionJson(versionId) {
         const p = path.join(this.gameDirectory, 'versions', versionId, `${versionId}.json`);
-        return JSON.parse(await fs.readFile(p, 'utf8'));
+        const data = JSON.parse(await fs.readFile(p, 'utf8'));
+        // Fabric / 部分加载器版本 JSON 不带 assetIndex，需要从父版本（inheritsFrom）继承
+        if ((!data.assetIndex && !data.assets) && data.inheritsFrom) {
+            try {
+                const parentPath = path.join(this.gameDirectory, 'versions', data.inheritsFrom, `${data.inheritsFrom}.json`);
+                const parent = JSON.parse(await fs.readFile(parentPath, 'utf8'));
+                if (parent.assetIndex) data.assetIndex = parent.assetIndex;
+                if (parent.assets) data.assets = parent.assets;
+            } catch (err) {
+                this.logger.warn(`Cannot read parent version ${data.inheritsFrom} for asset index: ${err.message}`);
+            }
+        }
+        return data;
     }
 
     async _fetchAssetIndex(indexName, assetIndexMeta) {

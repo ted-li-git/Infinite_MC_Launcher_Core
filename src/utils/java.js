@@ -132,7 +132,16 @@ export function getRequiredJavaVersion(versionData, versionId) {
     if (versionData?.javaVersion?.majorVersion) {
         return versionData.javaVersion.majorVersion;
     }
-    const id = versionId || '';
+    let id = versionId || '';
+
+    // 加载器版本 id 提取内部游戏版本：
+    //   fabric-loader-0.16.10-1.16.5  → 1.16.5（官方 id：loader 在前，游戏版本在后）
+    //   1.20.1-Fabric[_0.16.10]       → 1.20.1
+    //   1.20.1-Forge_47.2.0           → 1.20.1（Forge 原本也能靠前缀正则匹配，这里统一处理）
+    const fabricStd = /^fabric-loader-\d+\.\d+(?:\.\d+)?(?:[.-][\w.+-]*)?-(.+)$/.exec(id);
+    if (fabricStd) id = fabricStd[1];
+    const loaderSuffix = /^(.+?)-(?:Fabric|Forge|NeoForge)(?:[_\-][\w.+-]*)?$/i.exec(id);
+    if (loaderSuffix) id = loaderSuffix[1];
 
     // 1.x 正式版 / 预发布 1.x-preN / 候选版 1.x-rcN
     const sub = /^1\.(\d+)/.exec(id);

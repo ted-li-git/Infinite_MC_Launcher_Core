@@ -4,10 +4,10 @@
 
 Infinite MC Launcher Core（IMCLC）跨平台 Minecraft 启动器核心库，为每一个自研启动器打好最坚固的启动底座。
 
-**当前版本：v1.0.5-beta.3**
+**当前版本：v1.0.6-beta.4**
 
 - **全版本兼容**：`Minecraft 1.0 → 最新版`（含 1.0/1.2.5/1.7.10 等远古版本、1.12.2-1.21+ 现代版、以及 26w4a 等快照/预发布/RC 版本）
-- **Mod 加载器**：Forge（1.7.10-1.20.1）、NeoForge（1.20.1-最新 26.x.x）、Fabric（inheritsFrom 自动合并）
+- **Mod 加载器**：Forge（1.7.10-1.20.1）、NeoForge（1.20.1-最新 26.x.x）、**Fabric（✨ 自动安装：Meta API 自动下载 loader/profile/库，写 `1.20.1-Fabric` 即可）**
 - **5 种认证方式**：离线 / 微软设备流 / Mojang 账密 / 第三方 Yggdrasil（LittleSkin/BlessingSkin/统一通行证/自定义皮肤站·新支持）
 - **Java 自动检测**：自动扫描 Windows/Mac/Linux 常见路径（含 x86 32位目录），按版本自动挑选 Java
 - **一键启动**：`quickLaunch` 一行代码完成 认证→安装→完整性检查→Java 检测→参数生成→启动
@@ -29,6 +29,7 @@ Infinite MC Launcher Core（IMCLC）跨平台 Minecraft 启动器核心库，为
 | | 版本安装（JSON/Client.jar/Libraries/Natives/Assets） | ✅ |
 | | 完整性校验（16 批并行，缺失自动重装） | ✅ |
 | | inheritsFrom 继承合并（Forge/NeoForge/Fabric） | ✅ |
+| | **Fabric 自动安装（Meta API，简写 `1.20.1-Fabric`）** | ✨ **新增** |
 | **Java** | 多路径自动扫描（含 x86 32 位目录） | ✅ |
 | | 版本号自动推断（1.x/快照/26.x 新格式） | ✅ |
 | | 要求 JVM < 当前 JVM 时，自动搜索降级版本 | ✅ |
@@ -63,7 +64,7 @@ Infinite MC Launcher Core（IMCLC）跨平台 Minecraft 启动器核心库，为
 # 方式一：从 GitHub 仓库直接安装（推荐，实时最新）
 npm install github:ted-li-git/Infinite_MC_Launcher_Core
 # 指定版本：
-npm install github:ted-li-git/Infinite_MC_Launcher_Core#v1.0.5-beta.3
+npm install github:ted-li-git/Infinite_MC_Launcher_Core#v1.0.6-beta.4
 
 # 方式二：克隆源码
 git clone https://github.com/ted-li-git/Infinite_MC_Launcher_Core.git
@@ -132,12 +133,64 @@ const proc = await launcher.quickLaunch({
 });
 ```
 
+### Fabric 一键安装启动（✨ v1.0.6-beta.4 新增）
+
+无需手动跑 Fabric installer，核心库直接对接 [Fabric Meta API](https://meta.fabricmc.net/)，写版本名即可自动下载 loader + 原版 + 全部库：
+
+```javascript
+import { MCLauncher } from './src/index.js';
+const launcher = new MCLauncher({ gameDirectory: './minecraft' });
+
+// 方式一：简写（推荐）—— 省略 loader 版本时自动选最新稳定版
+const proc = await launcher.quickLaunch({
+    version: '1.20.1-Fabric',   // 自动安装 原版1.20.1 + 最新稳定 Fabric Loader
+    authType: 'offline',
+    username: 'Steve',
+    memory: '4G'
+});
+
+// 方式二：简写指定 loader 版本
+// version: '1.20.1-Fabric_0.16.10'
+
+// 方式三：官方标准版本名（loader 版本在前，与官方启动器目录名一致）
+// version: 'fabric-loader-0.16.10-1.20.1'
+```
+
+版本名三种写法等价对照：
+
+| 写法 | 示例 | 说明 |
+|---|---|---|
+| 简写（自动 loader） | `1.20.1-Fabric` | 查询 Meta API 选最新 stable loader |
+| 简写（指定 loader） | `1.20.1-Fabric_0.16.10` | 自己锁定 loader 版本 |
+| 官方标准格式 | `fabric-loader-0.16.10-1.20.1` | ⚠️ loader 版本在前、游戏版本在后 |
+
+也可使用底层 API 精确控制：
+
+```javascript
+import { VersionManager } from './src/index.js';
+const vm = new VersionManager('./minecraft');
+
+const loaders = await vm.getFabricLoaders('1.20.1');  // 查询可用 loader 列表
+// → [{ version: '0.16.10', stable: true }, ...]
+
+const result = await vm.installFabric('1.20.1', '0.16.10'); // 指定版本安装
+// const result = await vm.installFabric('1.20.1');          // 最新稳定版
+// → { versionId: 'fabric-loader-0.16.10-1.20.1', modLoader: 'fabric', ... }
+```
+
+> Fabric 支持的游戏版本为 **1.14 及以上**（含快照）；Fabric mod 的 `.jar` 放进 `mods/`（或 `--instance-dir` 指定实例的 `mods/`）即可。
+
 ### 命令行调用（任何语言通用）
 
 ```bash
 # 启动 1.12.2 离线
 node cli.js launch --version 1.12.2 --username Player --auth offline \
     --game-dir "./minecraft" --memory 4G
+
+# Fabric（自动最新稳定 loader，安装+启动一条龙）
+node cli.js launch --version 1.20.1-Fabric --username Player --game-dir "./minecraft"
+# Fabric 指定 loader（官方格式 loader 版本在前）
+node cli.js install --version fabric-loader-0.16.10-1.20.1 --game-dir "./minecraft"
 
 # LittleSkin + 直连服务器
 node cli.js launch --version 1.20.1 --auth littleskin \
@@ -165,10 +218,10 @@ node cli.js -h                            # 完整帮助
 |---|---|---|---|---|
 | 远古正式版 | 1.0 ~ 1.6.4 | **Java 6**（自动回退用 Java 8 可跑） | 极少量 Forge 旧版 | legacy `resources/` 资源目录；`minecraftArguments` 字符串解析 |
 | 中世代 | 1.7 ~ 1.12.1 | **Java 8** | Forge 1.7.10+ | x86 32 位 Java 扫描；`width`/`height` 变量 |
-| 稳定世代 | 1.12.2 ~ 1.16.5 | **Java 8** | Forge (主流) | 完整 inheritsFrom 继承合并 |
-| 过渡世代 | 1.17 ~ 1.17.1 | **Java 16** | Forge | `javaVersion` 字段标配 |
+| 稳定世代 | 1.12.2 ~ 1.16.5 | **Java 8** | Forge (主流) / Fabric 1.14+ | 完整 inheritsFrom 继承合并 |
+| 过渡世代 | 1.17 ~ 1.17.1 | **Java 16** | Forge / Fabric | `javaVersion` 字段标配 |
 | 现代世代 | 1.18 ~ 1.20.4 | **Java 17** | Forge / NeoForge 1.20.1 / Fabric | `arguments.game` 数组格式 |
-| 最新世代 | 1.20.5 ~ 最新版（含 26.x.x） | **Java 21** | NeoForge 主流 | `library_directory` / `classpath_separator` 变量 |
+| 最新世代 | 1.20.5 ~ 最新版（含 26.x.x） | **Java 21** | NeoForge 主流 / Fabric | `library_directory` / `classpath_separator` 变量 |
 | 测试版 | 快照 / Pre / RC（26w4a 等） | **按快照号区间自动推断** | 随对应正式版 | YYwWWx 周构建号专用正则分支 |
 
 ## 文档链接

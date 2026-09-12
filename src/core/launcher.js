@@ -110,7 +110,9 @@ export class MCLauncher {
     async installVersion(version) {
         this.logger.info(`Installing version: ${version}`);
         const result = await this.versionManager.install(version);
-        await this.assetManager.downloadAssets(version);
+        // Fabric 简写别名安装后真实 id 是 fabric-loader-<mc>-<loader>，资源索引挂在父版本上
+        const assetVersionId = result.versionId || version;
+        await this.assetManager.downloadAssets(assetVersionId);
         this.logger.info('Version installation completed', result);
         return result;
     }
@@ -118,9 +120,8 @@ export class MCLauncher {
     async prepareLaunch() {
         if (!this.profile) throw new Error('User not authenticated');
 
-        const version = this.options.version === 'latest'
-            ? await this.versionManager.getLatestVersion()
-            : this.options.version;
+        // 统一规范化版本名：'latest' → 最新正式版；Fabric 简写别名 → fabric-loader-<mc>-<loader>
+        const version = await this.versionManager.resolveVersionId(this.options.version);
 
         this.logger.info(`Preparing launch for version: ${version}`);
 

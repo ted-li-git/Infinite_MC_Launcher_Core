@@ -319,13 +319,20 @@ Infinite MC Launcher Core CLI
   node cli.js <command> [options]
 
 命令:
-  install    安装游戏版本
+  install    安装游戏版本（原版 / Forge / NeoForge / Fabric 均可）
   launch     启动游戏
   versions   列出可用版本
   check      检查版本完整性
   java       检测系统 Java 安装
   login      正版登录（Microsoft 设备流认证）
   stdio      进入 stdio 交互模式（JSON-RPC）
+
+版本名写法 (--version):
+  原版              1.20.1 / 1.7.10 / 26w4a（快照）
+  Forge / NeoForge  1.20.1-Forge_47.2.0（版本 JSON 已安装时）
+  Fabric 标准       fabric-loader-0.16.10-1.20.1（loader版本在前，官方格式）
+  Fabric 简写       1.20.1-Fabric_0.16.10（指定 loader）
+                    1.20.1-Fabric（自动选最新稳定 loader）
 
 基础选项:
   --game-dir <path>    游戏目录（默认 ./minecraft）
@@ -362,6 +369,11 @@ Infinite MC Launcher Core CLI
   node cli.js versions --game-dir ./minecraft --json
   node cli.js install --version 1.20.1
   node cli.js launch --version 1.20.1 --username Player1 --auth offline
+
+  # Fabric（安装+启动一条龙，自动选最新稳定 loader）
+  node cli.js launch --version 1.20.1-Fabric --username Player1
+  # Fabric 指定 loader 版本（官方格式：loader 版本在前）
+  node cli.js install --version fabric-loader-0.16.10-1.20.1
 
   # LittleSkin 账密登录
   node cli.js launch --version 1.20.1 --auth littleskin \

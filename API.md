@@ -1,6 +1,6 @@
 # Infinite MC Launcher Core API 文档
 
-> v1.0.5-beta.3 | 提供「一键启动 / 版本管理 / 5 种认证 / Java 自动检测 / Mod 管理 / 资源下载 / 日志」完整 API
+> v1.0.6-beta.4 | 提供「一键启动 / 版本管理（原版/Forge/NeoForge/Fabric）/ 5 种认证 / Java 自动检测 / Mod 管理 / 资源下载 / 日志」完整 API
 
 ```
 包名：@ted-li-git/infinite-mc-launcher-core
@@ -214,6 +214,18 @@ console.log('args 数量:', launchArgs.args.length);
 
 下载并安装版本（version.json → client.jar → libraries → natives → assets）。已安装会跳过。
 
+`versionId` 支持的写法（v1.0.6-beta.4 起 Fabric 自动安装）：
+
+| 写法 | 示例 | 行为 |
+|---|---|---|
+| 原版版本号 | `1.20.1` / `26w4a` | 从 Mojang manifest 安装 |
+| Forge / NeoForge | `1.20.1-Forge_47.2.0` | 需版本 JSON 已在 versions 目录 |
+| **Fabric 简写（自动 loader）** | `1.20.1-Fabric` | 调 Fabric Meta API 选最新稳定 loader 并安装 |
+| **Fabric 简写（指定 loader）** | `1.20.1-Fabric_0.16.10` | 安装指定 loader |
+| **Fabric 官方标准名** | `fabric-loader-0.16.10-1.20.1` | ⚠️ loader 版本在前、游戏版本在后 |
+
+Fabric 安装返回额外字段：`{ versionId, modLoader: 'fabric', gameVersion, loaderVersion, librariesCount }`。
+
 ##### `cleanup() → void`
 
 清空内部 `auth`/`profile` 引用（进程不会被 kill）。
@@ -352,7 +364,23 @@ await vm.buildClassPath(versionData, versionId);         // classpath 字符串
 await vm.extractNatives(versionData, versionId);         // natives 解压
 await vm.mergeParentVersion(child);                      // inheritsFrom 递归合并
 VersionManager.getRequiredJavaVersion(vData, vId);       // 静态：版本→Java主版本号
+
+// ===== ✨ Fabric（v1.0.6-beta.4）=====
+await vm.resolveVersionId('1.20.1-Fabric');     // 别名→真实id fabric-loader-0.16.10-1.20.1
+await vm.getFabricLoaders('1.20.1');            // → [{ version, stable }]（5分钟缓存）
+await vm.getLatestFabricLoader('1.20.1');       // → 最新稳定 loader 版本号
+await vm.installFabric('1.20.1', '0.16.10');    // 指定 loader 安装（第二参可省略=最新稳定）
+vm._parseFabricVersion('1.20.1-Fabric_0.16.10');// → { gameVersion, loaderVersion, alias }
 ```
+
+**Fabric 安装流程**（`installFabric`）：
+1. `GET https://meta.fabricmc.net/v2/versions/loader/<游戏版本>/<loader>/profile/json` 拉取官方 profile JSON
+2. 按 profile 内官方 id 落盘 `versions/fabric-loader-<loader>-<mc>/`
+3. 父原版未安装时自动先安装父版本（client.jar / 原版库 / natives 全部继承）
+4. 下载 Fabric 库（fabric-loader / intermediary / sponge-mixin / asm 等，来自 `maven.fabricmc.net`）
+5. 启动时 `_mergeParentVersion` 合并父版本，mainClass 自动换成 `net.fabricmc.loader.impl.launch.knot.KnotClient`
+
+> Fabric 官方支持 **Minecraft 1.14+**（含快照）；查询不支持的版本时抛出明确错误。
 
 ---
 
@@ -506,4 +534,4 @@ try {
 | Pre-release / RC (`1.x-pre1` / `1.x-rc1`) | 同对应正式版 | 同对应版 | 同对应版 | ✅ |
 | Forge（inheritsFrom 链） | 继承父版本结构 | 同父版 | ✅ |
 | NeoForge（inheritsFrom 链） | 同父版 + library_directory 变量 | 同父版 | ✅ |
-| Fabric（inheritsFrom 链） | 同父版 | 同父版 | ⚠️ 通用继承机制可用，Fabric repo 未自动识别 |
+| Fabric（Meta API 自动安装） | profile JSON + inheritsFrom 合并，KnotClient mainClass | 同父版 | ✨ v1.0.6-beta.4（1.14+） |

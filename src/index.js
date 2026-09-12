@@ -2,6 +2,7 @@ import { MCLauncher } from './core/launcher.js';
 import { OfflineAuth } from './auth/offline.js';
 import { MicrosoftAuth } from './auth/microsoft.js';
 import { MojangAuth } from './auth/mojang.js';
+import { ThirdPartyAuth, PRESET_SITES } from './auth/thirdparty.js';
 import { VersionManager } from './game/version.js';
 import { AssetManager } from './game/assets.js';
 
@@ -10,6 +11,8 @@ export {
     OfflineAuth,
     MicrosoftAuth,
     MojangAuth,
+    ThirdPartyAuth,
+    PRESET_SITES,
     VersionManager,
     AssetManager
 };

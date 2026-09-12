@@ -5,6 +5,7 @@ import path from 'path';
 
 const OS_NAME = { win32: 'windows', darwin: 'osx' }[process.platform] || 'linux';
 const MANIFEST_URL = 'https://launchermeta.mojang.com/mc/game/version_manifest.json';
+const FABRIC_META_URL = 'https://meta.fabricmc.net/v2';
 const LAUNCHER_NAME = 'Infinite MC Launcher Core';
 const LAUNCHER_VERSION = '1.0.0';
 
@@ -19,6 +20,7 @@ export class VersionManager {
         this.versionsCache = null;
         this.lastFetchTime = null;
         this._versionJsonCache = new Map(); // 版本 JSON 内存缓存
+        this._fabricLoaderCache = new Map(); // Fabric loader 列表缓存（gameVersion -> {list, time}）
     }
 
     async ensureDirectories() {
@@ -210,7 +212,8 @@ export class VersionManager {
             return library.downloads.artifact.url;
         }
         const { baseParts, fileName } = this._parseLibName(library);
-        const repo = this._getMavenRepo(library.name);
+        // Fabric / 新版 Forge 的 JSON 中每个库自带 maven 仓库地址（可能带尾部斜杠）
+        const repo = (library.url ? library.url.replace(/\/+$/, '') : null) || this._getMavenRepo(library.name);
         return [repo, ...baseParts, fileName].join('/');
     }
 
@@ -235,6 +238,12 @@ export class VersionManager {
             return { versionId, alreadyInstalled: true };
         }
 
+        // Fabric 版本路由（fabric-loader-<mc>-<loader> 或 <mc>-Fabric[_loader]）
+        const fabricInfo = this._parseFabricVersion(versionId);
+        if (fabricInfo) {
+            return this.installFabric(fabricInfo.gameVersion, fabricInfo.loaderVersion);
+        }
+
         const versionInfo = (await this.getVersions()).find(v => v.id === versionId);
         if (!versionInfo) throw new Error(`Version ${versionId} not found`);
 
@@ -247,7 +256,8 @@ export class VersionManager {
                 this.logger.debug(`Library ${library.name} not allowed for current platform, skipping`);
                 continue;
             }
-            if (library.downloads?.artifact) {
+            // downloads.artifact（Mojang 格式）或纯 maven name（Fabric / 老版本格式）都需要下载
+            if (library.downloads?.artifact || library.name) {
                 await this.downloadLibrary(library);
             }
             if (library.downloads?.classifiers && library.natives) {
@@ -261,6 +271,124 @@ export class VersionManager {
 
         this.logger.info(`Version ${versionId} installed successfully`);
         return { versionId, alreadyInstalled: false, librariesCount: libraries.length, timestamp: new Date().toISOString() };
+    }
+
+    // ==================== Fabric 支持 ====================
+
+    /**
+     * 识别 Fabric 版本名
+     * 支持：
+     *   官方标准格式 fabric-loader-<loader版本>-<游戏版本>  如 fabric-loader-0.16.10-1.20.1
+     *   简写格式 <游戏版本>-Fabric[_<loader版本>]          如 1.20.1-Fabric / 1.20.1-Fabric_0.16.10
+     * @returns {{gameVersion:string, loaderVersion:string|null, alias:boolean}|null}
+     */
+    _parseFabricVersion(versionId) {
+        if (!versionId || typeof versionId !== 'string') return null;
+        // 官方 profile JSON 的 id 段顺序是 loader 在前、游戏版本在后（以 meta.fabricmc.net 实际返回为准）
+        let m = /^fabric-loader-(\d+\.\d+(?:\.\d+)?(?:[.-][\w.+-]*)?)-(.+)$/.exec(versionId);
+        if (m) return { gameVersion: m[2], loaderVersion: m[1], alias: false };
+        m = /^(.+)-Fabric(?:[_-]([\w.+-]+))?$/i.exec(versionId);
+        if (m) return { gameVersion: m[1], loaderVersion: m[2] || null, alias: true };
+        return null;
+    }
+
+    /**
+     * 把用户给的版本名规范化为真实的版本目录 id
+     * - 'latest' → 最新正式版
+     * - Fabric 简写别名 → fabric-loader-<loader>-<mc>（省略 loader 时查询最新 stable）
+     * - 其他（原版 / Forge / NeoForge / 标准 fabric id）原样返回
+     */
+    async resolveVersionId(versionId) {
+        if (!versionId || versionId === 'latest') {
+            return this.getLatestVersion('release');
+        }
+        const info = this._parseFabricVersion(versionId);
+        if (!info || !info.alias) return versionId;
+        const loader = info.loaderVersion || await this.getLatestFabricLoader(info.gameVersion);
+        return `fabric-loader-${loader}-${info.gameVersion}`;
+    }
+
+    /**
+     * 查询某游戏版本可用的 Fabric loader 列表（5 分钟内存缓存）
+     * @returns {Promise<Array<{version:string, stable:boolean}>>}
+     */
+    async getFabricLoaders(gameVersion) {
+        const cached = this._fabricLoaderCache.get(gameVersion);
+        if (cached && Date.now() - cached.time < 5 * 60 * 1000) return cached.list;
+
+        const url = `${FABRIC_META_URL}/versions/loader/${encodeURIComponent(gameVersion)}`;
+        this.logger.info(`Fetching Fabric loader list for ${gameVersion}`);
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch Fabric loader list for ${gameVersion}: ${response.status} ${response.statusText}`);
+        }
+        const raw = await response.json();
+        if (!Array.isArray(raw) || raw.length === 0) {
+            throw new Error(`No Fabric loader available for Minecraft ${gameVersion}（该版本可能不受 Fabric 支持）`);
+        }
+        const list = raw
+            .filter(item => item?.loader?.version)
+            .map(item => ({ version: item.loader.version, stable: !!item.loader.stable }));
+        this._fabricLoaderCache.set(gameVersion, { list, time: Date.now() });
+        return list;
+    }
+
+    /** 查询某游戏版本最新稳定版 Fabric loader（无稳定版时取第一个） */
+    async getLatestFabricLoader(gameVersion) {
+        const list = await this.getFabricLoaders(gameVersion);
+        const picked = list.find(l => l.stable) || list[0];
+        this.logger.info(`Latest Fabric loader for ${gameVersion}: ${picked.version}`);
+        return picked.version;
+    }
+
+    /**
+     * 安装 Fabric（自动先确保原版父版本已安装）
+     * @param {string} gameVersion 游戏版本，如 1.20.1 / 1.21.4 / 26w4a
+     * @param {string|null} loaderVersion loader 版本，null/省略时自动选最新 stable
+     */
+    async installFabric(gameVersion, loaderVersion = null) {
+        const resolvedLoader = loaderVersion || await this.getLatestFabricLoader(gameVersion);
+        this.logger.info(`Installing Fabric loader ${resolvedLoader} for ${gameVersion}`);
+
+        // 1. 拉取 Fabric 官方 profile JSON（标准 Mojang 版本 JSON 格式，带 inheritsFrom）
+        const profileUrl = `${FABRIC_META_URL}/versions/loader/${encodeURIComponent(gameVersion)}/${encodeURIComponent(resolvedLoader)}/profile/json`;
+        const response = await fetch(profileUrl);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch Fabric profile (${gameVersion}/${resolvedLoader}): ${response.status} ${response.statusText}`);
+        }
+        const profile = await response.json();
+        const versionId = profile.id || `fabric-loader-${resolvedLoader}-${gameVersion}`;
+
+        // 2. 保存版本 JSON（目录名/id 与官方启动器一致：fabric-loader-<mc>-<loader>）
+        const versionPath = path.join(this.versionsDirectory, versionId);
+        await fs.mkdir(versionPath, { recursive: true });
+        await fs.writeFile(path.join(versionPath, `${versionId}.json`), JSON.stringify(profile, null, 2));
+
+        // 3. 确保父原版已安装（client.jar / 原版 libraries / natives 都来自父版本）
+        if (!(await this.isInstalled(gameVersion))) {
+            this.logger.info(`Fabric requires vanilla ${gameVersion}, installing parent version first`);
+            await this.install(gameVersion);
+        }
+
+        // 4. 下载 Fabric 自己的 libraries（fabric-loader / intermediary / mixin / asm 等）
+        const fabricLibraries = profile.libraries || [];
+        for (const library of fabricLibraries) {
+            if (library.rules && !this.evaluateRules(library.rules)) continue;
+            if (library.downloads?.artifact || library.name) {
+                await this.downloadLibrary(library);
+            }
+        }
+
+        this.logger.info(`Fabric ${versionId} installed successfully (${fabricLibraries.length} libraries)`);
+        return {
+            versionId,
+            alreadyInstalled: false,
+            gameVersion,
+            loaderVersion: resolvedLoader,
+            modLoader: 'fabric',
+            librariesCount: fabricLibraries.length,
+            timestamp: new Date().toISOString()
+        };
     }
 
     evaluateRules(rules, features = {}) {
@@ -327,8 +455,10 @@ export class VersionManager {
         const childLibNames = new Set(childLibraries.map(l => l.name));
         const mergedLibraries = [...childLibraries, ...parentLibraries.filter(l => !childLibNames.has(l.name))];
 
-        let mergedArguments = childData.arguments || parentData.arguments;
-        if (childData.arguments && parentData.arguments) {
+        // Fabric profile 的 arguments 是空对象 {}，必须视为"未提供"，否则会丢掉父版本的现代 JVM 参数
+        const childHasArgs = childData.arguments && Object.keys(childData.arguments).length > 0;
+        let mergedArguments = childHasArgs ? childData.arguments : parentData.arguments;
+        if (childHasArgs && parentData.arguments) {
             mergedArguments = {
                 jvm: [...(parentData.arguments.jvm || []), ...(childData.arguments.jvm || [])],
                 game: [...(parentData.arguments.game || []), ...(childData.arguments.game || [])]

@@ -4,7 +4,7 @@
 
 Infinite MC Launcher Core 是一个功能完整的 Minecraft 启动模块，支持离线登录、Microsoft 正版登录、第三方 Yggdrasil 登录（LittleSkin / BlessingSkin / UnionPass / 自定义皮肤站），以及客户端直连服务器、Mod 管理、资源下载、完整性校验等。本指南将帮助你快速集成到你的项目中。
 
-当前版本：`v1.0.5-beta.3`（支持 Minecraft 1.0 ~ 1.21.11 全版本 + 快照）
+当前版本：`v1.0.6-beta.4`（支持 Minecraft 1.0 ~ 1.21.11 全版本 + 快照，原版 / Forge / NeoForge / Fabric）
 
 ## 集成方式
 
@@ -13,7 +13,7 @@ Infinite MC Launcher Core 是一个功能完整的 Minecraft 启动模块，支�
 ```bash
 npm install github:ted-li-git/Infinite_MC_Launcher_Core
 # 或指定 tag
-npm install github:ted-li-git/Infinite_MC_Launcher_Core#v1.0.5-beta.3
+npm install github:ted-li-git/Infinite_MC_Launcher_Core#v1.0.6-beta.4
 ```
 
 ```javascript
@@ -280,9 +280,28 @@ await launcher.installVersion('1.20.1');
 // 安装 Forge/NeoForge 等加载器版本（版本名写 xxx-Forge_yyy）
 await launcher.installVersion('1.20.1-Forge_47.2.0');
 
+// ✨ 安装 Fabric（v1.0.6-beta.4 起自动下载，无需 installer）
+await launcher.installVersion('1.20.1-Fabric');                // 最新稳定 Loader
+await launcher.installVersion('1.20.1-Fabric_0.16.10');       // 指定 Loader
+await launcher.installVersion('fabric-loader-0.16.10-1.20.1'); // 官方标准名（Loader 在前）
+
 // 检查版本是否已安装
 const isInstalled = await launcher.versionManager.isInstalled('1.20.1');
+
+// 查询某 MC 版本可用的 Fabric Loader 列表
+const fabricLoaders = await launcher.versionManager.getFabricLoaders('1.20.1');
+// → [{ version: '0.16.10', stable: true }, ...]
 ```
+
+**Fabric 版本名三种写法：**
+
+| 写法 | 示例 | 说明 |
+|---|---|---|
+| 简写（自动 Loader） | `1.20.1-Fabric` | 自动选最新稳定版 Loader，最省心 |
+| 简写（指定 Loader） | `1.20.1-Fabric_0.16.10` | 锁定 Loader 版本 |
+| 官方标准格式 | `fabric-loader-0.16.10-1.20.1` | ⚠️ Loader 版本在前、游戏版本在后 |
+
+Fabric 通过 [Meta API](https://meta.fabricmc.net/) 自动完成：拉取 profile JSON → 落盘版本目录 → 自动安装父原版 → 下载 fabric-loader/intermediary/mixin/asm 等库 → 启动时合并父版本并把 mainClass 换成 `KnotClient`。支持 MC **1.14+**（含快照）。
 
 #### 游戏启动
 
@@ -595,6 +614,14 @@ A: 按顺序排查：
 ### Q5: quickLaunch 和自己手动调用 offlineLogin + installVersion + launch 有什么区别？
 
 A: quickLaunch 多做了：**自动 Java 检测**、**版本安装前检查**、**完整性校验修复**、**根据 authType 自动选择登录方法**、**异常上下文封装**。一般情况推荐用 quickLaunch。
+
+### Q6: Fabric 和 Forge 什么区别？怎么选？Fabric 支持 1.12.2 吗？
+
+A:
+- **Fabric**：轻量、更新快（快照版当天就能用）、API 简洁，适合新版本和快照；Mod 需要下载标注 Fabric 的版本，且大多数依赖 **Fabric API** 前置。
+- **Forge/NeoForge**：功能重、Mod 生态庞大（尤其老版本），1.12.2/1.7.10 等经典整合包基本只有 Forge。
+- Fabric 官方只支持 **Minecraft 1.14+**；1.12.2 及更早请用 Forge。
+- 两者 Mod 互不通用，版本名也不同：Fabric 写 `1.20.1-Fabric`，Forge 写 `1.20.1-Forge_47.x`。
 
 ## 性能优化
 
