@@ -1,7 +1,7 @@
 # Fast Easy Guide - 小白入门指南
 
 > 这篇文档假设你**完全不懂 JavaScript**，也能用这个库做出一个能用的 MC 启动器。
-> 本文档 v1.0.6-beta.4 更新。
+> 本文档 v1.1.0-beta.5 更新。
 
 ---
 
@@ -296,6 +296,53 @@ node cli.js launch --version 1.21.1 --username test --auth offline --game-dir ".
   "version": "1.21.1"
 }
 ```
+
+---
+
+## 加载 Quilt / NeoForge / Forge（和 Fabric 一样简单）
+
+版本名换成对应写法就行，其余步骤完全相同：
+
+```bash
+# Quilt（MC 1.14+）
+node cli.js launch --version 1.20.1-Quilt --username 玩家名 --auth offline --game-dir "..."
+
+# NeoForge（MC 1.20.2+）
+node cli.js launch --version 1.21.1-NeoForge --username 玩家名 --auth offline --game-dir "..."
+
+# Forge（新版老版都行，含 1.12.2）
+node cli.js launch --version 1.20.1-Forge --username 玩家名 --auth offline --game-dir "..."
+node cli.js launch --version 1.12.2-Forge_14.23.5.2860 --username 玩家名 --auth offline --game-dir "..."
+```
+
+> 不写 loader 版本号就自动选最新版；想锁定版本用下划线：`1.20.1-Forge_47.2.0`。
+> 注意：Forge / NeoForge 第一次安装要跑官方安装器，**本机必须装好 Java**（Quilt / Fabric 不需要）。
+
+## 两个省心功能
+
+**内存自动分配**：`memory` 写 `'auto'`（命令行 `--memory auto`），按你电脑内存的 1/4 自动分（最少 1G、最多 8G），不用自己算。
+
+```bash
+node cli.js launch --version 1.20.1 --memory auto --username 玩家名 --auth offline --game-dir "..."
+```
+
+**崩溃自动诊断**：游戏闪退（退出码非 0）时，启动器会自动把 `logs/latest.log` 最后 40 行和最新的崩溃报告头部打印到日志里，照着报错搜就行。
+
+## 开服务器（MCServer）
+
+Node.js 里三行启动一个服务端：
+
+```javascript
+import { MCServer } from './src/index.js';
+
+const server = new MCServer({ serverJar: './server/server.jar', maxMemory: '2G', eula: true });
+server.on('playerJoin', name => console.log(name + ' 上线了'));
+server.start();
+// server.send('say 大家好');  // 发控制台指令
+// await server.stop();       // 关服
+```
+
+想要崩了自动拉起？加 `autoRestart: true, maxRestarts: 3`。
 
 ---
 

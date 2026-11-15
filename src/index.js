@@ -5,6 +5,7 @@ import { MojangAuth } from './auth/mojang.js';
 import { ThirdPartyAuth, PRESET_SITES } from './auth/thirdparty.js';
 import { VersionManager } from './game/version.js';
 import { AssetManager } from './game/assets.js';
+import { MCServer } from './server/server.js';
 
 export {
     MCLauncher,
@@ -14,7 +15,8 @@ export {
     ThirdPartyAuth,
     PRESET_SITES,
     VersionManager,
-    AssetManager
+    AssetManager,
+    MCServer
 };
 
 export * from './utils/uuid.js';

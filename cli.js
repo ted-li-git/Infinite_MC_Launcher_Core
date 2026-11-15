@@ -329,10 +329,14 @@ Infinite MC Launcher Core CLI
 
 版本名写法 (--version):
   原版              1.20.1 / 1.7.10 / 26w4a（快照）
-  Forge / NeoForge  1.20.1-Forge_47.2.0（版本 JSON 已安装时）
   Fabric 标准       fabric-loader-0.16.10-1.20.1（loader版本在前，官方格式）
   Fabric 简写       1.20.1-Fabric_0.16.10（指定 loader）
                     1.20.1-Fabric（自动选最新稳定 loader）
+  Quilt 标准        quilt-loader-0.24.0-1.20.1
+  Quilt 简写        1.20.1-Quilt_0.24.0 / 1.20.1-Quilt（自动选最新 loader）
+  NeoForge 标准     neoforge-21.1.172
+  NeoForge 简写     1.21.1-NeoForge_21.1.172 / 1.21.1-NeoForge（仅支持 MC 1.20.2+）
+  Forge 简写        1.20.1-Forge_47.2.0 / 1.20.1-Forge（自动选最新，支持 1.7.10/1.12.2 等老版本）
 
 基础选项:
   --game-dir <path>    游戏目录（默认 ./minecraft）
@@ -346,7 +350,7 @@ Infinite MC Launcher Core CLI
                          mojang          Mojang 账密
                          third-party     第三方 Yggdrasil
                          littleskin      LittleSkin 快捷方式
-  --memory <size>      内存大小（如 2G）
+  --memory <size>      内存大小（如 2G；auto 表示按系统内存自动分配 1G~8G）
   --java-path <path>   Java 路径
   --window-width <px>  窗口宽度
   --window-height <px> 窗口高度

@@ -4,7 +4,7 @@
 
 Infinite MC Launcher Core 是一个功能完整的 Minecraft 启动模块，支持离线登录、Microsoft 正版登录、第三方 Yggdrasil 登录（LittleSkin / BlessingSkin / UnionPass / 自定义皮肤站），以及客户端直连服务器、Mod 管理、资源下载、完整性校验等。本指南将帮助你快速集成到你的项目中。
 
-当前版本：`v1.0.6-beta.4`（支持 Minecraft 1.0 ~ 1.21.11 全版本 + 快照，原版 / Forge / NeoForge / Fabric）
+当前版本：`v1.1.0-beta.5`（支持 Minecraft 1.0 ~ 1.21.11 全版本 + 快照，原版 / Forge / NeoForge / Fabric / Quilt）
 
 ## 集成方式
 
@@ -13,7 +13,7 @@ Infinite MC Launcher Core 是一个功能完整的 Minecraft 启动模块，支�
 ```bash
 npm install github:ted-li-git/Infinite_MC_Launcher_Core
 # 或指定 tag
-npm install github:ted-li-git/Infinite_MC_Launcher_Core#v1.0.6-beta.4
+npm install github:ted-li-git/Infinite_MC_Launcher_Core#v1.1.0-beta.5
 ```
 
 ```javascript

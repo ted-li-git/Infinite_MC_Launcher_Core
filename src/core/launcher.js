@@ -8,6 +8,8 @@ import { ModManager } from '../mods/manager.js';
 import { Logger } from '../utils/logger.js';
 import { saveConfig, loadConfig } from '../utils/config.js';
 import { join } from 'path';
+import { totalmem } from 'os';
+import { promises as fs } from 'fs';
 
 export class MCLauncher {
     constructor(options = {}) {
@@ -135,6 +137,9 @@ export class MCLauncher {
             }
         }
 
+        // 内存自动分配：memory 为 'auto' 时按系统总内存的 1/4 分配（1G ~ 8G 之间）
+        this.options.memory = this._resolveMemory(this.options.memory);
+
         const launchArgs = await this.versionManager.generateLaunchArgs({
             version,
             profile: this.profile,
@@ -190,6 +195,39 @@ export class MCLauncher {
         }
     }
 
+    // 解析内存配置：'auto' 时按系统总内存的 1/4 分配，限制在 1G ~ 8G
+    _resolveMemory(memory) {
+        if (memory !== 'auto') return memory;
+        const totalGB = totalmem() / (1024 ** 3);
+        const allocGB = Math.min(8, Math.max(1, Math.floor(totalGB / 4)));
+        this.logger.info(`Auto memory allocation: system ${totalGB.toFixed(1)}G total, allocating ${allocGB}G`);
+        return `${allocGB}G`;
+    }
+
+    // 游戏崩溃时提取日志尾部与最新崩溃报告，便于定位问题
+    async _extractCrashInfo(gameDir) {
+        const info = { latestLogTail: null, crashReport: null, crashReportPath: null };
+        try {
+            const latestLog = await fs.readFile(join(gameDir, 'logs', 'latest.log'), 'utf8');
+            info.latestLogTail = latestLog.trimEnd().split('\n').slice(-40).join('\n');
+        } catch { /* 日志不存在则跳过 */ }
+        try {
+            const crashDir = join(gameDir, 'crash-reports');
+            const files = (await fs.readdir(crashDir)).filter(f => f.startsWith('crash-') && f.endsWith('.txt'));
+            if (files.length > 0) {
+                const withMtime = await Promise.all(files.map(async f => ({
+                    name: f,
+                    mtime: (await fs.stat(join(crashDir, f))).mtimeMs
+                })));
+                withMtime.sort((a, b) => b.mtime - a.mtime);
+                info.crashReportPath = join(crashDir, withMtime[0].name);
+                const content = await fs.readFile(info.crashReportPath, 'utf8');
+                info.crashReport = content.split('\n').slice(0, 30).join('\n');
+            }
+        } catch { /* 崩溃报告目录不存在则跳过 */ }
+        return info;
+    }
+
     async launch(options = {}) {
         this.logger.info('Starting game launch', { ...this.options, ...options });
         const launchArgs = await this.prepareLaunch();
@@ -204,7 +242,19 @@ export class MCLauncher {
 
         gameProcess.stdout.on('data', data => this.logger.debug('Game stdout:', data.toString()));
         gameProcess.stderr.on('data', data => this.logger.warn('Game stderr:', data.toString()));
-        gameProcess.on('close', code => this.logger.info(`Game process exited with code ${code}`));
+        gameProcess.on('close', async code => {
+            this.logger.info(`Game process exited with code ${code}`);
+            if (code !== 0) {
+                const crashInfo = await this._extractCrashInfo(launchOptions.gameDirectory);
+                if (crashInfo.crashReportPath) {
+                    this.logger.error(`Crash report: ${crashInfo.crashReportPath}`);
+                    this.logger.error(`Crash report head:\n${crashInfo.crashReport}`);
+                }
+                if (crashInfo.latestLogTail) {
+                    this.logger.error(`latest.log tail:\n${crashInfo.latestLogTail}`);
+                }
+            }
+        });
         gameProcess.on('error', error => this.logger.error('Game process error:', error));
 
         this.logger.info('Game launched successfully');

@@ -1,7 +1,7 @@
 # .NET 调用指南
 
 > .NET 通过子进程调用 `node cli.js`，无需 JNI / COM。`CLI_PATH` = cli.js 完整路径。
-> 核心库当前版本：`v1.0.6-beta.4`，支持 MC 1.0 ~ 1.21.11 + 快照，原版 / Forge / NeoForge / Fabric，第三方 Yggdrasil 登录（LittleSkin / BlessingSkin / UnionPass）。
+> 核心库当前版本：`v1.1.0-beta.5`，支持 MC 1.0 ~ 1.21.11 + 快照，原版 / Forge / NeoForge / Fabric / Quilt，第三方 Yggdrasil 登录（LittleSkin / BlessingSkin / UnionPass）。
 
 ## 两种调用方式
 

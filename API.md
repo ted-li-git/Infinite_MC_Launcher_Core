@@ -1,6 +1,6 @@
 # Infinite MC Launcher Core API 文档
 
-> v1.0.6-beta.4 | 提供「一键启动 / 版本管理（原版/Forge/NeoForge/Fabric）/ 5 种认证 / Java 自动检测 / Mod 管理 / 资源下载 / 日志」完整 API
+> v1.1.0-beta.5 | 提供「一键启动 / 版本管理（原版/Forge/NeoForge/Fabric）/ 5 种认证 / Java 自动检测 / Mod 管理 / 资源下载 / 日志」完整 API
 
 ```
 包名：@ted-li-git/infinite-mc-launcher-core
@@ -51,7 +51,7 @@ const launcher = new MCLauncher({ /* options */ });
 | `instanceDir` | string | `null` | 独立实例目录（mods/saves/config 独立，libraries 共享） |
 | `javaPath` | string | `'java'` | Java 可执行路径，不指定时自动检测 |
 | `version` | string | `'latest'` | 默认游戏版本 |
-| `memory` | string | `'2G'` | JVM 最大内存（如 `'512M'`/`'4G'`） |
+| `memory` | string | `'2G'` | JVM 最大内存（如 `'512M'`/`'4G'`）；`'auto'` 时按系统总内存 1/4 分配（1G~8G） |
 | `windowWidth` | number | `854` | 窗口宽度像素 |
 | `windowHeight` | number | `480` | 窗口高度像素 |
 | `enableMods` | boolean | `false` | 是否启用 Mod 管理参数拼接 |
@@ -371,6 +371,23 @@ await vm.getFabricLoaders('1.20.1');            // → [{ version, stable }]（5
 await vm.getLatestFabricLoader('1.20.1');       // → 最新稳定 loader 版本号
 await vm.installFabric('1.20.1', '0.16.10');    // 指定 loader 安装（第二参可省略=最新稳定）
 vm._parseFabricVersion('1.20.1-Fabric_0.16.10');// → { gameVersion, loaderVersion, alias }
+
+// ===== ✨ Quilt =====
+await vm.getQuiltLoaders('1.20.1');             // → [{ version, stable }]
+await vm.installQuilt('1.20.1', '0.26.0');      // 第二参省略 = 最新稳定
+// 版本名：quilt-loader-<loader>-<mc> 或简写 1.20.1-Quilt[_loader]
+
+// ===== ✨ NeoForge（MC 1.20.2+）=====
+await vm.getNeoForgeVersions('1.21.1');         // → ['21.1.172', ...]（maven-metadata）
+await vm.getLatestNeoForge('1.21.1');           // → 最新版本号
+await vm.installNeoForge('1.21.1', '21.1.172'); // 官方 installer 无头安装（需本机 Java）
+// 版本名：neoforge-<ver> 或简写 1.21.1-NeoForge[_ver]
+
+// ===== ✨ Forge（含 1.12.2 老版本）=====
+await vm.getForgeVersions('1.20.1');            // → ['47.2.0', ...]
+await vm.getLatestForge('1.20.1');              // → '47.x.x'
+await vm.installForge('1.20.1', '47.2.0');      // 自动选 --install-client / --installClient
+// 版本名：<mc>-forge-<ver> 或简写 1.20.1-Forge[_ver]；1.12.2 等老版本自动过滤 serverreq 库
 ```
 
 **Fabric 安装流程**（`installFabric`）：
@@ -439,7 +456,40 @@ await mm.cleanupCache();               // 7 天以上缓存
 
 ---
 
-## 七、Logger（日志系统）
+## 七、MCServer（服务端管理）✨
+
+```javascript
+import { MCServer } from './src/index.js';
+
+const server = new MCServer({
+  serverJar: './server/server.jar', // 必填
+  javaPath: 'java',
+  minMemory: '1G', maxMemory: '2G',
+  gui: false,          // false 时追加 nogui
+  eula: true,          // 自动写入 eula.txt
+  autoRestart: false,  // 非主动退出时自动重启
+  restartDelay: 5000,  // 重启延迟 ms
+  maxRestarts: 3       // 最大自动重启次数
+});
+
+server.start();              // 启动（starting → 检测到 Done → running）
+server.send('say Hello');    // 发送控制台指令
+server.getPlayers();         // → ['Player1', ...] 在线玩家
+server.getStatus();          // → 'stopped'|'starting'|'running'|'stopping'
+await server.stop();         // 发送 stop 指令优雅停止
+
+// 事件
+server.on('log', (line) => {});        // 每行 stdout/stderr
+server.on('ready', () => {});          // 进入 running
+server.on('playerJoin', (name) => {});
+server.on('playerLeave', (name) => {});
+server.on('error', (err) => {});
+server.on('crash', ({ code }) => {});  // 非主动退出且超过 maxRestarts
+```
+
+---
+
+## 八、Logger（日志系统）
 
 ```javascript
 import { Logger, LogLevel } from './src/index.js';
@@ -479,7 +529,7 @@ Logger.setLogger(customInstance);
 
 ---
 
-## 八、完整示例：LittleSkin + 直连服务器
+## 九、完整示例：LittleSkin + 直连服务器
 
 ```javascript
 import { MCLauncher } from './src/index.js';
@@ -517,7 +567,7 @@ try {
 
 ---
 
-## 九、兼容性矩阵
+## 十、兼容性矩阵
 
 | Minecraft 版本 | 格式 | Java | Mod 加载器 | 状态 |
 |---|---|---|---|---|

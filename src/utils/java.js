@@ -136,11 +136,24 @@ export function getRequiredJavaVersion(versionData, versionId) {
 
     // 加载器版本 id 提取内部游戏版本：
     //   fabric-loader-0.16.10-1.16.5  → 1.16.5（官方 id：loader 在前，游戏版本在后）
+    //   quilt-loader-0.24.0-1.20.1    → 1.20.1（同 Fabric 格式）
     //   1.20.1-Fabric[_0.16.10]       → 1.20.1
     //   1.20.1-Forge_47.2.0           → 1.20.1（Forge 原本也能靠前缀正则匹配，这里统一处理）
     const fabricStd = /^fabric-loader-\d+\.\d+(?:\.\d+)?(?:[.-][\w.+-]*)?-(.+)$/.exec(id);
     if (fabricStd) id = fabricStd[1];
-    const loaderSuffix = /^(.+?)-(?:Fabric|Forge|NeoForge)(?:[_\-][\w.+-]*)?$/i.exec(id);
+    const quiltStd = /^quilt-loader-\d+\.\d+(?:\.\d+)?(?:[.-][\w.+-]*)?-(.+)$/.exec(id);
+    if (quiltStd) id = quiltStd[1];
+
+    // NeoForge 标准 id：neoforge-<a>.<b>[.<c>] → MC 1.<a>[.<b>]（NeoForge 仅支持 1.20.2+）
+    // 1.20.5+ 需要 Java 21；其余 NeoForge 支持范围（1.20.2~1.20.4 / 1.21+）分别需要 17 / 21
+    const neoStd = /^neoforge-(\d+)\.(\d+)/i.exec(id);
+    if (neoStd) {
+        const a = parseInt(neoStd[1]), b = parseInt(neoStd[2]);
+        if (a > 20 || (a === 20 && b >= 5)) return 21;
+        return 17;
+    }
+
+    const loaderSuffix = /^(.+?)-(?:Fabric|Forge|NeoForge|Quilt)(?:[_\-][\w.+-]*)?$/i.exec(id);
     if (loaderSuffix) id = loaderSuffix[1];
 
     // 1.x 正式版 / 预发布 1.x-preN / 候选版 1.x-rcN

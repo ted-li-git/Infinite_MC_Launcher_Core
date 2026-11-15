@@ -1,5 +1,18 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
+
+// jar 内元数据文件的探测顺序（entry 名是固定常量，无注入风险）
+const METADATA_ENTRIES = [
+    'fabric.mod.json',
+    'quilt.mod.json',
+    'META-INF/neoforge.mods.toml',
+    'META-INF/mods.toml',
+    'mcmod.info'
+];
 
 export class ModManager {
     constructor(launcher) {
@@ -55,16 +68,120 @@ export class ModManager {
         return mods;
     }
 
+    // 用系统自带 tar（bsdtar，可读 zip）把 jar 里指定 entry 输出到 stdout
+    async _extractEntry(jarPath, entryName) {
+        const { stdout } = await execFileAsync('tar', ['-xOf', jarPath, entryName], {
+            maxBuffer: 4 * 1024 * 1024,
+            windowsHide: true
+        });
+        return stdout;
+    }
+
+    // 依次尝试各元数据 entry，返回第一个成功解析的元数据；全部失败返回 null
+    async _readModMetadata(jarPath) {
+        for (const entry of METADATA_ENTRIES) {
+            let content;
+            try {
+                content = await this._extractEntry(jarPath, entry);
+            } catch {
+                continue; // entry 不存在或 tar 不可用，尝试下一个
+            }
+            try {
+                const meta = this._parseMetadata(entry, content);
+                if (meta) return meta;
+            } catch (error) {
+                this.logger.debug(`Failed to parse ${entry} in ${jarPath}: ${error.message}`);
+            }
+        }
+        return null;
+    }
+
+    // 按 entry 类型解析元数据内容，返回 { modId, name, version, description, loader, ... }
+    _parseMetadata(entry, content) {
+        switch (entry) {
+            case 'fabric.mod.json': {
+                const json = JSON.parse(content); // 含注释/尾逗号会抛错，视为无效
+                return {
+                    modId: json.id,
+                    name: json.name,
+                    version: json.version,
+                    description: json.description,
+                    environment: json.environment,
+                    depends: json.depends,
+                    loader: 'fabric'
+                };
+            }
+            case 'quilt.mod.json': {
+                const json = JSON.parse(content);
+                const ql = json.quilt_loader || {};
+                return {
+                    modId: ql.id,
+                    name: (ql.metadata && ql.metadata.name) || ql.id,
+                    version: ql.version,
+                    description: (ql.metadata && ql.metadata.description) || json.description,
+                    loader: 'quilt'
+                };
+            }
+            case 'META-INF/mods.toml':
+            case 'META-INF/neoforge.mods.toml': {
+                // 不引 toml 依赖，用正则提取关键字段
+                const modLoader = content.match(/^\s*modLoader\s*=\s*"([^"]+)"/m);
+                // [[mods]] 段的第一组字段
+                const modsSection = content.match(/\[\[mods\]\]([\s\S]*?)(?=\n\s*\[\[|$)/);
+                const section = modsSection ? modsSection[1] : content;
+                const pick = key => {
+                    const m = section.match(new RegExp(`${key}\\s*=\\s*"([^"]+)"`));
+                    return m ? m[1] : undefined;
+                };
+                return {
+                    modId: pick('modId'),
+                    name: pick('displayName'),
+                    version: pick('version'),
+                    description: pick('description'),
+                    modLoader: modLoader ? modLoader[1] : undefined,
+                    loader: entry.includes('neoforge') ? 'neoforge' : 'forge'
+                };
+            }
+            case 'mcmod.info': {
+                // 老 Forge（1.12.2-）：可能是数组或 { modList: [...] }
+                const json = JSON.parse(content);
+                const info = Array.isArray(json) ? json[0] : (Array.isArray(json.modList) ? json.modList[0] : json);
+                if (!info || typeof info !== 'object') return null;
+                return {
+                    modId: info.modid,
+                    name: info.name,
+                    version: info.version,
+                    description: info.description,
+                    loader: 'forge-legacy'
+                };
+            }
+            default:
+                return null;
+        }
+    }
+
     async analyzeModFile(modPath) {
         try {
             const stats = await fs.stat(modPath);
-            return {
-                name: path.basename(modPath, '.jar').replace('.disabled', ''),
+            const baseName = path.basename(modPath, '.jar').replace('.disabled', '');
+            const base = {
+                name: baseName,
                 size: stats.size,
                 lastModified: stats.mtime,
                 filePath: modPath,
                 valid: false
             };
+            // 尝试从 jar 内提取 mod 元数据（fabric/quilt/forge/neoforge/legacy）
+            const meta = await this._readModMetadata(modPath);
+            if (meta && meta.modId) {
+                return {
+                    ...base,
+                    ...meta,
+                    name: meta.name || baseName,
+                    valid: true
+                };
+            }
+            return base;
         } catch (error) {
             this.logger.error(`Failed to analyze mod file: ${modPath}`, error);
             return {

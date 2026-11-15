@@ -6,6 +6,9 @@ import path from 'path';
 const OS_NAME = { win32: 'windows', darwin: 'osx' }[process.platform] || 'linux';
 const MANIFEST_URL = 'https://launchermeta.mojang.com/mc/game/version_manifest.json';
 const FABRIC_META_URL = 'https://meta.fabricmc.net/v2';
+const QUILT_META_URL = 'https://meta.quiltmc.org/v3';
+const NEOFORGE_MAVEN_URL = 'https://maven.neoforged.net/releases';
+const FORGE_MAVEN_URL = 'https://maven.minecraftforge.net/releases';
 const LAUNCHER_NAME = 'Infinite MC Launcher Core';
 const LAUNCHER_VERSION = '1.0.0';
 
@@ -21,6 +24,8 @@ export class VersionManager {
         this.lastFetchTime = null;
         this._versionJsonCache = new Map(); // 版本 JSON 内存缓存
         this._fabricLoaderCache = new Map(); // Fabric loader 列表缓存（gameVersion -> {list, time}）
+        this._quiltLoaderCache = new Map(); // Quilt loader 列表缓存
+        this._mavenVersionCache = new Map(); // Forge/NeoForge maven metadata 缓存
     }
 
     async ensureDirectories() {
@@ -127,22 +132,38 @@ export class VersionManager {
 
         // 收集需要检查的文件
         const checks = [];
-        const jarVersionId = versionData.inheritsFrom || versionId;
+        const jarVersionId = versionData.inheritsFrom || versionData.jar || versionId;
         checks.push({ path: path.join(this.versionsDirectory, jarVersionId, `${jarVersionId}.jar`), name: `versions/${jarVersionId}/${jarVersionId}.jar` });
 
         for (const library of versionData.libraries || []) {
             if (library.rules && !this.evaluateRules(library.rules)) continue;
+            if (library.clientreq === false) continue; // 老 Forge 格式：非客户端必需库
             if (library.downloads?.artifact || library.name) {
-                checks.push({ path: this.getLibraryPath(library), name: `libraries/${library.name}` });
+                checks.push({
+                    path: this.getLibraryPath(library),
+                    name: `libraries/${library.name}`,
+                    size: library.downloads?.artifact?.size
+                });
             }
         }
 
-        // 分批并行检查（每批 16 个）
+        // 分批并行检查（每批 16 个）；有 size 信息时先对比大小，不匹配视为损坏并删除以便重装时重新下载
         const BATCH = 16;
         for (let i = 0; i < checks.length; i += BATCH) {
             const batch = checks.slice(i, i + BATCH);
             const results = await Promise.all(batch.map(async c => {
-                try { await fs.access(c.path); return null; }
+                try {
+                    if (c.size != null) {
+                        const stat = await fs.stat(c.path);
+                        if (stat.size !== c.size) {
+                            await fs.unlink(c.path).catch(() => {});
+                            return c.name;
+                        }
+                    } else {
+                        await fs.access(c.path);
+                    }
+                    return null;
+                }
                 catch { return c.name; }
             }));
             for (const r of results) if (r) missing.push(r);
@@ -213,7 +234,9 @@ export class VersionManager {
         }
         const { baseParts, fileName } = this._parseLibName(library);
         // Fabric / 新版 Forge 的 JSON 中每个库自带 maven 仓库地址（可能带尾部斜杠）
-        const repo = (library.url ? library.url.replace(/\/+$/, '') : null) || this._getMavenRepo(library.name);
+        let repo = (library.url ? library.url.replace(/\/+$/, '') : null) || this._getMavenRepo(library.name);
+        // 老 Forge（如 1.12.2）JSON 中的 files.minecraftforge.net/maven 已失效，重写到新 maven 仓库
+        repo = repo.replace(/^https?:\/\/files\.minecraftforge\.net\/maven/i, FORGE_MAVEN_URL);
         return [repo, ...baseParts, fileName].join('/');
     }
 
@@ -238,10 +261,25 @@ export class VersionManager {
             return { versionId, alreadyInstalled: true };
         }
 
-        // Fabric 版本路由（fabric-loader-<mc>-<loader> 或 <mc>-Fabric[_loader]）
+        // Fabric 版本路由（fabric-loader-<loader>-<mc> 或 <mc>-Fabric[_loader]）
         const fabricInfo = this._parseFabricVersion(versionId);
         if (fabricInfo) {
             return this.installFabric(fabricInfo.gameVersion, fabricInfo.loaderVersion);
+        }
+        // Quilt 版本路由（quilt-loader-<loader>-<mc> 或 <mc>-Quilt[_loader]）
+        const quiltInfo = this._parseQuiltVersion(versionId);
+        if (quiltInfo) {
+            return this.installQuilt(quiltInfo.gameVersion, quiltInfo.loaderVersion);
+        }
+        // NeoForge 版本路由（neoforge-<ver> 或 <mc>-NeoForge[_ver]）
+        const neoInfo = this._parseNeoForgeVersion(versionId);
+        if (neoInfo) {
+            return this.installNeoForge(neoInfo.gameVersion, neoInfo.loaderVersion);
+        }
+        // Forge 版本路由（<mc>-forge-<ver> 或 <mc>-Forge[_ver]）
+        const forgeInfo = this._parseForgeVersion(versionId);
+        if (forgeInfo) {
+            return this.installForge(forgeInfo.gameVersion, forgeInfo.loaderVersion);
         }
 
         const versionInfo = (await this.getVersions()).find(v => v.id === versionId);
@@ -256,6 +294,7 @@ export class VersionManager {
                 this.logger.debug(`Library ${library.name} not allowed for current platform, skipping`);
                 continue;
             }
+            if (library.clientreq === false) continue; // 老 Forge 格式：非客户端必需库
             // downloads.artifact（Mojang 格式）或纯 maven name（Fabric / 老版本格式）都需要下载
             if (library.downloads?.artifact || library.name) {
                 await this.downloadLibrary(library);
@@ -295,17 +334,37 @@ export class VersionManager {
     /**
      * 把用户给的版本名规范化为真实的版本目录 id
      * - 'latest' → 最新正式版
-     * - Fabric 简写别名 → fabric-loader-<loader>-<mc>（省略 loader 时查询最新 stable）
-     * - 其他（原版 / Forge / NeoForge / 标准 fabric id）原样返回
+     * - Fabric 简写别名 → fabric-loader-<loader>-<mc>（省略 loader 时查询最新）
+     * - Quilt 简写别名 → quilt-loader-<loader>-<mc>
+     * - NeoForge 简写别名 → neoforge-<ver>
+     * - Forge 简写别名 → <mc>-forge-<ver>
+     * - 其他（原版 / 标准 id）原样返回
      */
     async resolveVersionId(versionId) {
         if (!versionId || versionId === 'latest') {
             return this.getLatestVersion('release');
         }
-        const info = this._parseFabricVersion(versionId);
-        if (!info || !info.alias) return versionId;
-        const loader = info.loaderVersion || await this.getLatestFabricLoader(info.gameVersion);
-        return `fabric-loader-${loader}-${info.gameVersion}`;
+        const fabric = this._parseFabricVersion(versionId);
+        if (fabric?.alias) {
+            const loader = fabric.loaderVersion || await this.getLatestFabricLoader(fabric.gameVersion);
+            return `fabric-loader-${loader}-${fabric.gameVersion}`;
+        }
+        const quilt = this._parseQuiltVersion(versionId);
+        if (quilt?.alias) {
+            const loader = quilt.loaderVersion || await this.getLatestQuiltLoader(quilt.gameVersion);
+            return `quilt-loader-${loader}-${quilt.gameVersion}`;
+        }
+        const neo = this._parseNeoForgeVersion(versionId);
+        if (neo?.alias) {
+            const ver = neo.loaderVersion || await this.getLatestNeoForge(neo.gameVersion);
+            return `neoforge-${ver}`;
+        }
+        const forge = this._parseForgeVersion(versionId);
+        if (forge?.alias) {
+            const ver = forge.loaderVersion || await this.getLatestForge(forge.gameVersion);
+            return `${forge.gameVersion}-forge-${ver}`;
+        }
+        return versionId;
     }
 
     /**
@@ -389,6 +448,334 @@ export class VersionManager {
             librariesCount: fabricLibraries.length,
             timestamp: new Date().toISOString()
         };
+    }
+
+    // ==================== Quilt 支持 ====================
+
+    /**
+     * 识别 Quilt 版本名
+     * 支持：
+     *   官方标准格式 quilt-loader-<loader版本>-<游戏版本>  如 quilt-loader-0.24.0-1.20.1
+     *   简写格式 <游戏版本>-Quilt[_<loader版本>]           如 1.20.1-Quilt / 1.20.1-Quilt_0.24.0
+     */
+    _parseQuiltVersion(versionId) {
+        if (!versionId || typeof versionId !== 'string') return null;
+        let m = /^quilt-loader-(\d+\.\d+(?:\.\d+)?(?:[.-][\w.+-]*)?)-(.+)$/.exec(versionId);
+        if (m) return { gameVersion: m[2], loaderVersion: m[1], alias: false };
+        m = /^(.+)-Quilt(?:[_-]([\w.+-]+))?$/i.exec(versionId);
+        if (m) return { gameVersion: m[1], loaderVersion: m[2] || null, alias: true };
+        return null;
+    }
+
+    /**
+     * 查询某游戏版本可用的 Quilt loader 列表（5 分钟内存缓存）
+     * 注意：Quilt meta API 返回的列表无序且无 stable 字段（已实测验证）
+     * @returns {Promise<Array<{version:string}>>}
+     */
+    async getQuiltLoaders(gameVersion) {
+        const cached = this._quiltLoaderCache.get(gameVersion);
+        if (cached && Date.now() - cached.time < 5 * 60 * 1000) return cached.list;
+
+        const url = `${QUILT_META_URL}/versions/loader/${encodeURIComponent(gameVersion)}`;
+        this.logger.info(`Fetching Quilt loader list for ${gameVersion}`);
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch Quilt loader list for ${gameVersion}: ${response.status} ${response.statusText}`);
+        }
+        const raw = await response.json();
+        if (!Array.isArray(raw) || raw.length === 0) {
+            throw new Error(`No Quilt loader available for Minecraft ${gameVersion}（该版本可能不受 Quilt 支持）`);
+        }
+        const list = raw.filter(item => item?.loader?.version).map(item => ({ version: item.loader.version }));
+        this._quiltLoaderCache.set(gameVersion, { list, time: Date.now() });
+        return list;
+    }
+
+    /** 简易语义版本比较：a > b 返回正数（忽略 -beta 等后缀） */
+    _compareSemver(a, b) {
+        const pa = a.split('-')[0].split('.').map(n => parseInt(n) || 0);
+        const pb = b.split('-')[0].split('.').map(n => parseInt(n) || 0);
+        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+            const d = (pa[i] || 0) - (pb[i] || 0);
+            if (d !== 0) return d;
+        }
+        return 0;
+    }
+
+    /** 查询最新 Quilt loader：优先无预发布后缀的最高版本 */
+    async getLatestQuiltLoader(gameVersion) {
+        const list = await this.getQuiltLoaders(gameVersion);
+        const stable = list.filter(l => !l.version.includes('-'));
+        const candidates = stable.length > 0 ? stable : list;
+        const best = candidates.reduce((a, b) => this._compareSemver(b.version, a.version) > 0 ? b : a);
+        this.logger.info(`Latest Quilt loader for ${gameVersion}: ${best.version}`);
+        return best.version;
+    }
+
+    /**
+     * 安装 Quilt（自动先确保原版父版本已安装）
+     * @param {string} gameVersion 游戏版本
+     * @param {string|null} loaderVersion loader 版本，null/省略时自动选最新
+     */
+    async installQuilt(gameVersion, loaderVersion = null) {
+        const resolvedLoader = loaderVersion || await this.getLatestQuiltLoader(gameVersion);
+        this.logger.info(`Installing Quilt loader ${resolvedLoader} for ${gameVersion}`);
+
+        // 1. 拉取 Quilt 官方 profile JSON（标准 Mojang 版本 JSON 格式，带 inheritsFrom）
+        const profileUrl = `${QUILT_META_URL}/versions/loader/${encodeURIComponent(gameVersion)}/${encodeURIComponent(resolvedLoader)}/profile/json`;
+        const response = await fetch(profileUrl);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch Quilt profile (${gameVersion}/${resolvedLoader}): ${response.status} ${response.statusText}`);
+        }
+        const profile = await response.json();
+        const versionId = profile.id || `quilt-loader-${resolvedLoader}-${gameVersion}`;
+
+        // 2. 保存版本 JSON
+        const versionPath = path.join(this.versionsDirectory, versionId);
+        await fs.mkdir(versionPath, { recursive: true });
+        await fs.writeFile(path.join(versionPath, `${versionId}.json`), JSON.stringify(profile, null, 2));
+
+        // 3. 确保父原版已安装
+        if (!(await this.isInstalled(gameVersion))) {
+            this.logger.info(`Quilt requires vanilla ${gameVersion}, installing parent version first`);
+            await this.install(gameVersion);
+        }
+
+        // 4. 下载 Quilt 自己的 libraries
+        const quiltLibraries = profile.libraries || [];
+        for (const library of quiltLibraries) {
+            if (library.rules && !this.evaluateRules(library.rules)) continue;
+            if (library.downloads?.artifact || library.name) {
+                await this.downloadLibrary(library);
+            }
+        }
+
+        this.logger.info(`Quilt ${versionId} installed successfully (${quiltLibraries.length} libraries)`);
+        return {
+            versionId,
+            alreadyInstalled: false,
+            gameVersion,
+            loaderVersion: resolvedLoader,
+            modLoader: 'quilt',
+            librariesCount: quiltLibraries.length,
+            timestamp: new Date().toISOString()
+        };
+    }
+
+    // ==================== NeoForge 支持 ====================
+
+    /** NeoForge 版本号 → MC 版本：20.4.x → 1.20.4，21.0.x → 1.21，21.1.x → 1.21.1 */
+    _neoToMc(neoVersion) {
+        const m = /^(\d+)\.(\d+)/.exec(neoVersion);
+        if (!m) return null;
+        return m[2] === '0' ? `1.${m[1]}` : `1.${m[1]}.${m[2]}`;
+    }
+
+    /**
+     * 识别 NeoForge 版本名
+     * 支持：
+     *   官方标准格式 neoforge-<版本>        如 neoforge-21.1.172（installer 生成的目录 id）
+     *   简写格式 <游戏版本>-NeoForge[_版本]  如 1.21.1-NeoForge / 1.21.1-NeoForge_21.1.172
+     */
+    _parseNeoForgeVersion(versionId) {
+        if (!versionId || typeof versionId !== 'string') return null;
+        let m = /^neoforge-(\d+\.\d+(?:\.\d+)?(?:[-.]beta)?)$/i.exec(versionId);
+        if (m) return { gameVersion: this._neoToMc(m[1]), loaderVersion: m[1], alias: false };
+        m = /^(.+)-NeoForge(?:[_-]([\w.+-]+))?$/i.exec(versionId);
+        if (m) return { gameVersion: m[1], loaderVersion: m[2] || null, alias: true };
+        return null;
+    }
+
+    /**
+     * 查询 NeoForge 可用版本列表（maven-metadata，5 分钟缓存）
+     * @param {string|null} gameVersion 指定 MC 版本时过滤
+     * @returns {Promise<Array<{version:string, gameVersion:string}>>} 按版本升序
+     */
+    async getNeoForgeVersions(gameVersion = null) {
+        let versions = this._mavenVersionCache.get('neoforge');
+        if (!versions || Date.now() - versions.time > 5 * 60 * 1000) {
+            const url = `${NEOFORGE_MAVEN_URL}/net/neoforged/neoforge/maven-metadata.xml`;
+            this.logger.info('Fetching NeoForge maven metadata');
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch NeoForge maven metadata: ${response.status} ${response.statusText}`);
+            }
+            const xml = await response.text();
+            const list = [...xml.matchAll(/<version>([^<]+)<\/version>/g)].map(m => m[1]);
+            versions = { list, time: Date.now() };
+            this._mavenVersionCache.set('neoforge', versions);
+        }
+        const mapped = versions.list
+            .map(v => ({ version: v, gameVersion: this._neoToMc(v) }))
+            .filter(x => x.gameVersion);
+        return gameVersion ? mapped.filter(x => x.gameVersion === gameVersion) : mapped;
+    }
+
+    /** 查询某 MC 版本最新的 NeoForge 版本（优先非 beta） */
+    async getLatestNeoForge(gameVersion) {
+        const list = await this.getNeoForgeVersions(gameVersion);
+        if (list.length === 0) {
+            throw new Error(`No NeoForge available for Minecraft ${gameVersion}（NeoForge 仅支持 1.20.2+）`);
+        }
+        const stable = list.filter(x => !x.version.includes('beta'));
+        const picked = (stable.length > 0 ? stable : list).at(-1);
+        this.logger.info(`Latest NeoForge for ${gameVersion}: ${picked.version}`);
+        return picked.version;
+    }
+
+    /**
+     * 安装 NeoForge（通过官方 installer 无头安装）
+     * installer 会自动下载依赖并生成 versions/neoforge-<ver>/ 目录（inheritsFrom 指向游戏版本）
+     * @param {string} gameVersion 游戏版本（NeoForge 仅支持 1.20.2+）
+     * @param {string|null} neoVersion NeoForge 版本，null/省略时自动选最新
+     */
+    async installNeoForge(gameVersion, neoVersion = null) {
+        const resolved = neoVersion || await this.getLatestNeoForge(gameVersion);
+        this.logger.info(`Installing NeoForge ${resolved} for ${gameVersion}`);
+        const installerUrl = `${NEOFORGE_MAVEN_URL}/net/neoforged/neoforge/${resolved}/neoforge-${resolved}-installer.jar`;
+        await this._runModLoaderInstaller(installerUrl, `neoforge-${resolved}-installer.jar`, '--install-client');
+
+        const versionId = `neoforge-${resolved}`;
+        if (!(await this.isInstalled(versionId))) {
+            throw new Error(`NeoForge installer 执行后未找到版本 ${versionId}，安装可能失败`);
+        }
+        this.logger.info(`NeoForge ${versionId} installed successfully`);
+        return {
+            versionId,
+            alreadyInstalled: false,
+            gameVersion,
+            loaderVersion: resolved,
+            modLoader: 'neoforge',
+            timestamp: new Date().toISOString()
+        };
+    }
+
+    // ==================== Forge 支持 ====================
+
+    /**
+     * 识别 Forge 版本名
+     * 支持：
+     *   官方标准格式 <游戏版本>-forge-<版本>   如 1.12.2-forge-14.23.5.2860 / 1.20.1-forge-47.2.0
+     *   简写格式 <游戏版本>-Forge[_<版本>]     如 1.20.1-Forge / 1.12.2-Forge_14.23.5.2860
+     */
+    _parseForgeVersion(versionId) {
+        if (!versionId || typeof versionId !== 'string') return null;
+        let m = /^(.+)-forge-(\d+\.\d+(?:\.\d+)?.*)$/.exec(versionId);
+        if (m) return { gameVersion: m[1], loaderVersion: m[2], alias: false };
+        m = /^(.+)-Forge(?:[_-]([\w.+-]+))?$/.exec(versionId);
+        if (m) return { gameVersion: m[1], loaderVersion: m[2] || null, alias: true };
+        return null;
+    }
+
+    /**
+     * 查询某 MC 版本可用的 Forge 版本列表（maven-metadata，5 分钟缓存）
+     * @returns {Promise<string[]>} Forge 版本号（不含 MC 前缀），升序
+     */
+    async getForgeVersions(gameVersion) {
+        let versions = this._mavenVersionCache.get('forge');
+        if (!versions || Date.now() - versions.time > 5 * 60 * 1000) {
+            const url = `${FORGE_MAVEN_URL}/net/minecraftforge/forge/maven-metadata.xml`;
+            this.logger.info('Fetching Forge maven metadata');
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch Forge maven metadata: ${response.status} ${response.statusText}`);
+            }
+            const xml = await response.text();
+            const list = [...xml.matchAll(/<version>([^<]+)<\/version>/g)].map(m => m[1]);
+            versions = { list, time: Date.now() };
+            this._mavenVersionCache.set('forge', versions);
+        }
+        // maven metadata 中版本形如 1.12.2-14.23.5.2860 / 1.20.1-47.2.0
+        const prefix = `${gameVersion}-`;
+        return versions.list.filter(v => v.startsWith(prefix)).map(v => v.slice(prefix.length));
+    }
+
+    /** 查询某 MC 版本最新的 Forge 版本 */
+    async getLatestForge(gameVersion) {
+        const list = await this.getForgeVersions(gameVersion);
+        if (list.length === 0) {
+            throw new Error(`No Forge available for Minecraft ${gameVersion}`);
+        }
+        const stable = list.filter(v => !/pre|alpha|beta|rc/i.test(v));
+        const picked = (stable.length > 0 ? stable : list).at(-1);
+        this.logger.info(`Latest Forge for ${gameVersion}: ${picked}`);
+        return picked;
+    }
+
+    /**
+     * 安装 Forge（通过官方 installer 无头安装）
+     * 兼容 1.12.2 等老版本（installer 参数为 --installClient）和新版本（--install-client）
+     * @param {string} gameVersion 游戏版本
+     * @param {string|null} forgeVersion Forge 版本，null/省略时自动选最新
+     */
+    async installForge(gameVersion, forgeVersion = null) {
+        const resolved = forgeVersion || await this.getLatestForge(gameVersion);
+        this.logger.info(`Installing Forge ${resolved} for ${gameVersion}`);
+        const full = `${gameVersion}-${resolved}`;
+        const installerUrl = `${FORGE_MAVEN_URL}/net/minecraftforge/forge/${full}/forge-${full}-installer.jar`;
+        // 1.13+ 的 installer 用 --install-client；1.12.2 及更早用驼峰 --installClient
+        const clientArg = this._mcVersionAtLeast(gameVersion, 1, 13) ? '--install-client' : '--installClient';
+        await this._runModLoaderInstaller(installerUrl, `forge-${full}-installer.jar`, clientArg);
+
+        const versionId = full;
+        if (!(await this.isInstalled(versionId))) {
+            throw new Error(`Forge installer 执行后未找到版本 ${versionId}，安装可能失败`);
+        }
+        this.logger.info(`Forge ${versionId} installed successfully`);
+        return {
+            versionId,
+            alreadyInstalled: false,
+            gameVersion,
+            loaderVersion: resolved,
+            modLoader: 'forge',
+            timestamp: new Date().toISOString()
+        };
+    }
+
+    /** MC 版本号比较：version >= major.minor */
+    _mcVersionAtLeast(version, major, minor) {
+        const m = /^(\d+)\.(\d+)/.exec(version);
+        if (!m) return true; // 无法识别时按新版本处理
+        const [maj, min] = [parseInt(m[1]), parseInt(m[2])];
+        return maj > major || (maj === major && min >= minor);
+    }
+
+    /**
+     * 下载并用 Java 无头运行 mod loader 官方 installer（Forge / NeoForge 通用）
+     * @param {string} installerUrl installer jar 下载地址
+     * @param {string} fileName 临时文件名
+     * @param {string} clientArg 客户端安装参数（--install-client 或 --installClient）
+     */
+    async _runModLoaderInstaller(installerUrl, fileName, clientArg) {
+        const os = await import('os');
+        const { execFile } = await import('child_process');
+        const { promisify } = await import('util');
+        const { findJava } = await import('../utils/java.js');
+
+        // 1. 下载 installer 到临时目录（已存在则复用）
+        const tmpDir = path.join(os.tmpdir(), 'imc-installers');
+        await fs.mkdir(tmpDir, { recursive: true });
+        const installerPath = path.join(tmpDir, fileName);
+        if (!(await this._exists(installerPath))) {
+            this.logger.info(`Downloading installer: ${installerUrl}`);
+            const response = await fetch(installerUrl);
+            if (!response.ok) {
+                throw new Error(`Failed to download installer: ${response.status} ${response.statusText} (url: ${installerUrl})`);
+            }
+            await fs.writeFile(installerPath, Buffer.from(await response.arrayBuffer()));
+        }
+
+        // 2. 运行 installer（installer 需要 Java 8+，优先选 Java 17 兼容新老 installer）
+        const javaPath = await findJava(17) || await findJava(8) || 'java';
+        this.logger.info(`Running installer: ${javaPath} -jar ${fileName} ${clientArg} ${this.gameDirectory}`);
+        try {
+            await promisify(execFile)(javaPath, ['-jar', installerPath, clientArg, this.gameDirectory], {
+                maxBuffer: 16 * 1024 * 1024,
+                timeout: 10 * 60 * 1000
+            });
+        } catch (error) {
+            throw new Error(`Mod loader installer 执行失败: ${error.message}`);
+        }
     }
 
     evaluateRules(rules, features = {}) {
@@ -562,13 +949,14 @@ export class VersionManager {
     }
 
     async buildClassPath(versionData, versionId) {
-        const jarVersionId = versionData.inheritsFrom || versionId;
+        const jarVersionId = versionData.inheritsFrom || versionData.jar || versionId;
         const entries = [path.join(this.versionsDirectory, jarVersionId, `${jarVersionId}.jar`)];
 
         // 收集需要检查的库
         const toCheck = [];
         for (const library of versionData.libraries || []) {
             if (library.rules && !this.evaluateRules(library.rules)) continue;
+            if (library.clientreq === false) continue; // 老 Forge 格式：非客户端必需库
             if (library.downloads?.artifact) {
                 entries.push(this.getLibraryPath(library));
             } else if (library.name) {

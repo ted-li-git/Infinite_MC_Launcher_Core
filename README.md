@@ -4,7 +4,7 @@
 
 Infinite MC Launcher Core（IMCLC）跨平台 Minecraft 启动器核心库，为每一个自研启动器打好最坚固的启动底座。
 
-**当前版本：v1.0.6-beta.4**
+**当前版本：v1.1.0-beta.5**
 
 - **全版本兼容**：`Minecraft 1.0 → 最新版`（含 1.0/1.2.5/1.7.10 等远古版本、1.12.2-1.21+ 现代版、以及 26w4a 等快照/预发布/RC 版本）
 - **Mod 加载器**：Forge（1.7.10-1.20.1）、NeoForge（1.20.1-最新 26.x.x）、**Fabric（✨ 自动安装：Meta API 自动下载 loader/profile/库，写 `1.20.1-Fabric` 即可）**
@@ -29,7 +29,10 @@ Infinite MC Launcher Core（IMCLC）跨平台 Minecraft 启动器核心库，为
 | | 版本安装（JSON/Client.jar/Libraries/Natives/Assets） | ✅ |
 | | 完整性校验（16 批并行，缺失自动重装） | ✅ |
 | | inheritsFrom 继承合并（Forge/NeoForge/Fabric） | ✅ |
-| | **Fabric 自动安装（Meta API，简写 `1.20.1-Fabric`）** | ✨ **新增** |
+| | Fabric 自动安装（Meta API，简写 `1.20.1-Fabric`） | ✅ |
+| | **Quilt 自动安装（简写 `1.20.1-Quilt`）** | ✨ **新增** |
+| | **NeoForge 自动安装（简写 `1.21.1-NeoForge`）** | ✨ **新增** |
+| | **Forge 自动安装（简写 `1.20.1-Forge`，兼容 1.12.2 老版本）** | ✨ **新增** |
 | **Java** | 多路径自动扫描（含 x86 32 位目录） | ✅ |
 | | 版本号自动推断（1.x/快照/26.x 新格式） | ✅ |
 | | 要求 JVM < 当前 JVM 时，自动搜索降级版本 | ✅ |
@@ -42,7 +45,11 @@ Infinite MC Launcher Core（IMCLC）跨平台 Minecraft 启动器核心库，为
 | **启动** | `launcher.offlineLogin()` + `launcher.launch()` 两段式 | ✅ |
 | | `launcher.quickLaunch()` 一键启动 | ✅ |
 | | **直连服务器（`--server`/`--serverPort`）** | ✨ **新增** |
+| | **内存自动分配（`memory: 'auto'` → 系统内存 1/4）** | ✨ **新增** |
+| | **崩溃诊断（非 0 退出自动提取 latest.log 尾部 + 崩溃报告）** | ✨ **新增** |
 | | 独立实例目录 `instanceDir`（mods/saves 独立，libraries 共享） | ✅ |
+| **服务端** | **MCServer 服务端启动/停止/控制台指令** | ✨ **新增** |
+| | **玩家列表 / 状态监控 / 崩溃自动重启** | ✨ **新增** |
 | **Mod 管理** | Mod 扫描/安装/启用/禁用/删除 | ✅ |
 | | 批量启用/禁用/删除 | ✅ |
 | | 7 天以上缓存自动清理 | ✅ |
@@ -64,7 +71,7 @@ Infinite MC Launcher Core（IMCLC）跨平台 Minecraft 启动器核心库，为
 # 方式一：从 GitHub 仓库直接安装（推荐，实时最新）
 npm install github:ted-li-git/Infinite_MC_Launcher_Core
 # 指定版本：
-npm install github:ted-li-git/Infinite_MC_Launcher_Core#v1.0.6-beta.4
+npm install github:ted-li-git/Infinite_MC_Launcher_Core#v1.1.0-beta.5
 
 # 方式二：克隆源码
 git clone https://github.com/ted-li-git/Infinite_MC_Launcher_Core.git
@@ -179,6 +186,73 @@ const result = await vm.installFabric('1.20.1', '0.16.10'); // 指定版本安�
 ```
 
 > Fabric 支持的游戏版本为 **1.14 及以上**（含快照）；Fabric mod 的 `.jar` 放进 `mods/`（或 `--instance-dir` 指定实例的 `mods/`）即可。
+
+### Quilt / NeoForge / Forge 一键安装
+
+用法与 Fabric 相同，换版本名即可，`installVersion()` / `quickLaunch()` 自动解析 Loader 并合并版本 JSON：
+
+```javascript
+// Quilt（Meta API，同 Fabric 无需跑 installer）
+await launcher.quickLaunch({ version: '1.20.1-Quilt', authType: 'offline', username: 'Steve' });
+// 指定 loader：version: '1.20.1-Quilt_0.26.0'
+
+// NeoForge（MC 1.20.2+，官方 installer 无头安装）
+await launcher.quickLaunch({ version: '1.21.1-NeoForge', authType: 'offline', username: 'Steve' });
+// 指定版本：version: '1.21.1-NeoForge_21.1.172'
+
+// Forge（自动兼容 1.12.2 老版本：--installClient / clientreq 过滤 / 失效域名重写）
+await launcher.quickLaunch({ version: '1.20.1-Forge', authType: 'offline', username: 'Steve' });
+// 指定版本：version: '1.20.1-Forge_47.2.0'、'1.12.2-Forge_14.23.5.2860'
+```
+
+四种加载器版本名对照：
+
+| 加载器 | 官方标准格式 | 简写（自动最新 loader） | 简写（指定 loader） |
+|--------|--------------|------------------------|---------------------|
+| Fabric | `fabric-loader-0.16.10-1.20.1` | `1.20.1-Fabric` | `1.20.1-Fabric_0.16.10` |
+| Quilt | `quilt-loader-0.26.0-1.20.1` | `1.20.1-Quilt` | `1.20.1-Quilt_0.26.0` |
+| NeoForge | `neoforge-21.1.172` | `1.21.1-NeoForge` | `1.21.1-NeoForge_21.1.172` |
+| Forge | `1.20.1-forge-47.2.0` | `1.20.1-Forge` | `1.20.1-Forge_47.2.0` |
+
+底层 API：`vm.getQuiltLoaders(mc)` / `vm.installQuilt(mc[, loader])`、`vm.getNeoForgeVersions(mc)` / `vm.getLatestNeoForge(mc)` / `vm.installNeoForge(mc[, ver])`、`vm.getForgeVersions(mc)` / `vm.getLatestForge(mc)` / `vm.installForge(mc[, ver])`。
+
+> Forge / NeoForge 走官方 installer 无头安装，需本机有 Java；installer jar 缓存于系统临时目录复用。
+
+### 服务端启动（MCServer）
+
+```javascript
+import { MCServer } from './src/index.js';
+
+const server = new MCServer({
+    serverJar: './server/server.jar',  // 必填
+    javaPath: 'java',
+    minMemory: '1G', maxMemory: '2G',
+    gui: false,                        // 追加 nogui
+    eula: true,                        // 自动写入 eula.txt
+    autoRestart: true, restartDelay: 5000, maxRestarts: 3   // 崩溃自动重启
+});
+
+server.on('ready', () => console.log('服务端已就绪'));
+server.on('log', (line) => console.log(line));
+server.on('playerJoin', (name) => console.log(`${name} 加入`));
+server.on('playerLeave', (name) => console.log(`${name} 离开`));
+
+server.start();
+server.send('say Hello');              // 控制台指令
+server.getPlayers();                   // 在线玩家列表
+server.getStatus();                    // stopped/starting/running/stopping
+await server.stop();                   // 优雅停止
+```
+
+### 内存自动分配与崩溃诊断
+
+```javascript
+const launcher = new MCLauncher({
+    gameDirectory: './minecraft',
+    memory: 'auto'   // 按系统总内存 1/4 分配，限制 1G~8G
+});
+// 游戏非 0 退出时自动打印 logs/latest.log 尾部 40 行 + 最新 crash-reports/crash-*.txt 头部 30 行
+```
 
 ### 命令行调用（任何语言通用）
 
